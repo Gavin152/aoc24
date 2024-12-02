@@ -41,7 +41,7 @@ func main() {
 	slices.Sort(left)
 	slices.Sort(right)
 
-	for i, _ := range left {
+	for i := range left {
 		// fmt.Printf("%d", left[i])
 		if left[i] >= right[i] {
 			tally += left[i] - right[i]
