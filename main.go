@@ -2,28 +2,62 @@ package main
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	s "strings"
 
 	"github.com/Gavin152/aoc24/internal/filereader"
 )
 
-func countOccurance(n int, pool []int) int {
-	count := 0
-	for _, v := range pool {
-		if v == n {
-			count++
-		}
+func isSafe(report []string) bool {
+	previous, _ := strconv.Atoi(report[0])
+	level, _ := strconv.Atoi(report[1])
+
+	rising := true
+	if previous > level {
+		rising = false
 	}
-	return count
+
+	for i, string_val := range report {
+		if i == 0 {
+			continue
+		}
+		level, _ = strconv.Atoi(string_val)
+
+		// if level > previous && (level-previous < 1 || level-previous > 3) {
+		// 	fmt.Printf("Round: %d | Distance: %d\n", i+1, level-previous)
+		// 	return false
+		// }
+		// if previous > level && (previous-level < 1 || previous-level > 3) {
+		// 	fmt.Printf("Round: %d | Distance: %d\n", i+1, previous-level)
+		// 	return false
+		// }
+		// if level == previous {
+		// 	fmt.Printf("Round: %d | Distance: %d\n", i+1, level-previous)
+		// 	return false
+		// }
+
+		distance := level - previous
+		if !rising {
+			distance = distance * -1
+		}
+
+		if rising && level < previous {
+			return false
+		}
+
+		if distance < 1 || distance > 3 {
+			return false
+		}
+
+		previous = level
+	}
+	fmt.Printf("Safe report found: %v\n", report)
+	return true
 }
 
 func main() {
 
-	left := []int{}
-	right := []int{}
-	tally := 0
+	safeCount := 0
 
 	// filePath := "example.txt"
 	filePath := "data_a"
@@ -33,27 +67,15 @@ func main() {
 		clean_line := s.TrimSpace(line)
 		split_line := s.Split(clean_line, " ")
 
-		left_number, l_err := strconv.Atoi(split_line[0])
-		right_number, r_err := strconv.Atoi(split_line[len(split_line)-1])
-
-		if l_err != nil || r_err != nil {
-			fmt.Printf("Error parsing line: \nLEFT: %v\n RIGHT:%v\n", l_err, r_err)
+		if isSafe(split_line) {
+			safeCount++
 		}
 
-		left = append(left, left_number)
-		right = append(right, right_number)
 		return nil
 	})
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 	}
 
-	slices.Sort(left)
-	slices.Sort(right)
-
-	for _, val := range left {
-		tally += val * countOccurance(val, right)
-	}
-
-	fmt.Printf("Final tally is %d", tally)
+	fmt.Printf("Found %d safe reports", safeCount)
 }
