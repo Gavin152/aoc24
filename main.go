@@ -9,6 +9,16 @@ import (
 	"github.com/Gavin152/aoc24/internal/filereader"
 )
 
+func countOccurance(n int, pool []int) int {
+	count := 0
+	for _, v := range pool {
+		if v == n {
+			count++
+		}
+	}
+	return count
+}
+
 func main() {
 
 	left := []int{}
@@ -41,13 +51,8 @@ func main() {
 	slices.Sort(left)
 	slices.Sort(right)
 
-	for i := range left {
-		// fmt.Printf("%d", left[i])
-		if left[i] >= right[i] {
-			tally += left[i] - right[i]
-		} else if left[i] < right[i] {
-			tally += right[i] - left[i]
-		}
+	for _, val := range left {
+		tally += val * countOccurance(val, right)
 	}
 
 	fmt.Printf("Final tally is %d", tally)
