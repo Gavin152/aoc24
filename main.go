@@ -2,75 +2,12 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
-	s "strings"
+	"strings"
 
 	"github.com/Gavin152/aoc24/internal/filereader"
 )
-
-func remove(slice []int, s int) []int {
-	return append(slice[:s], slice[s+1:]...)
-}
-
-func findInvalidIndex(report []int) int {
-	previous := report[0]
-	level := report[1]
-	rising := true
-
-	if previous > level {
-		rising = false
-	}
-
-	for i, val := range report {
-		if i == 0 {
-			continue
-		}
-		level = val
-
-		distance := level - previous
-		if distance < 0 {
-			distance = distance * -1
-		}
-
-		isSequential := (rising && level > previous) || (!rising && previous > level)
-		isValid := 1 <= distance && distance <= 3
-		if !isSequential || !isValid {
-			return i
-		}
-		previous = level
-	}
-	// fmt.Printf("Safe report found: %v\n", report)
-	return -1
-}
-
-func isSafe(report []int) bool {
-	invalidIndex := findInvalidIndex(report)
-	if invalidIndex < 0 {
-		fmt.Printf("Valid report: %v\n", report)
-		return true
-	}
-	index1, index2 := invalidIndex-1, invalidIndex
-	swappedReport1 := deleteLevelAt(report, index1)
-	swappedReport2 := deleteLevelAt(report, index2)
-	swap1 := findInvalidIndex(swappedReport1) == -1
-	swap2 := findInvalidIndex(swappedReport2) == -1
-	if swap1 {
-		fmt.Printf("valid on retry %v\n", swappedReport1)
-		return true
-	}
-	if swap2 {
-		fmt.Printf("valid on retry %v\n", swappedReport2)
-		return true
-	}
-	return false
-}
-
-func deleteLevelAt(levels []int, idx int) []int {
-	deleted := make([]int, len(levels)-1)
-	copy(deleted[:idx], levels[:idx])
-	copy(deleted[idx:], levels[idx+1:])
-	return deleted
-}
 
 func main() {
 
@@ -81,18 +18,18 @@ func main() {
 	// filePath := "data_b"
 
 	err := filereader.ReadFileLineByLine(filePath, func(line string) error {
-		clean_line := s.TrimSpace(line)
-		split_line := s.Split(clean_line, " ")
+		re := regexp.MustCompile(`mul\(\d{1,3},\d{1,3}\)`)
+		multies := re.FindAllString(line, -1)
 
-		reps := []int{}
-		for _, val := range split_line {
-			num, _ := strconv.Atoi(val)
-			reps = append(reps, num)
-		}
-
-		if isSafe(reps) {
-			// fmt.Printf("Safe report found: %v\n", split_line)
-			safeCount++
+		for _, mul := range multies {
+			s, _ := strings.CutSuffix(mul, ")")
+			s, _ = strings.CutPrefix(s, "mul(")
+			factors := strings.Split(s, ",")
+			factor1, _ := strconv.Atoi(factors[0])
+			factor2, _ := strconv.Atoi(factors[1])
+			product := factor1 * factor2
+			fmt.Printf("%d x %d = %d\n", factor1, factor2, product)
+			safeCount += product
 		}
 
 		return nil
