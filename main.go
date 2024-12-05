@@ -2,101 +2,99 @@ package main
 
 import (
 	"fmt"
+	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/Gavin152/aoc24/internal/filereader"
 )
 
-var lines []string
-var directions [][]int
+func splitPages(raw *[]string, split *[][]int) {
+	for _, line := range *raw {
+		s := strings.Split(line, "|")
+		first, _ := strconv.Atoi(s[0])
+		second, _ := strconv.Atoi(s[1])
+		*split = append(*split, []int{first, second})
+	}
+}
 
-func findWords() int {
-	xmasCounter := 0
+func splitUpdates(raw *[]string, split *[][]int) {
+	for _, line := range *raw {
+		s := strings.Split(line, ",")
+		p := []int{}
+		for _, num := range s {
+			parsed, _ := strconv.Atoi(num)
+			p = append(p, parsed)
+		}
+		*split = append(*split, p)
+	}
+}
 
-	for i, line := range lines {
-		for j, rawChar := range line {
-			char := string(rawChar)
-
-			if char == "A" {
-				masCnt := 0
-				skip := false
-				for _, vec := range directions {
-					if checkDirection([]int{i, j}, vec) {
-						masCnt++
-					}
-					if masCnt == 2 && !skip {
-						fmt.Printf("Valid cross: [%d,%d]\n", i+1, j+1)
-						xmasCounter++
-						skip = true
-					}
-				}
+func checkUpdates(updates *[][]int, rules *[][]int) int {
+	sum := 0
+	for _, update := range *updates {
+		isValid := true
+		for i, rule := range *rules {
+			fmt.Printf("Checking Rule %d\n", i)
+			u_index1 := slices.Index(update, rule[0])
+			u_index2 := slices.Index(update, rule[1])
+			if u_index1 == -1 || u_index2 == -1 {
+				continue
+			}
+			if !(u_index1 < u_index2) {
+				fmt.Printf("Break on %d\n", i)
+				isValid = false
+				break
 			}
 		}
-	}
-
-	return xmasCounter
-}
-
-func checkDirection(anchor []int, vector []int) bool {
-	// fmt.Printf("checking X in [%d,%d] in dir %v\n", anchor[0], anchor[1], vector)
-	// var h int
-	// var v int
-	h := anchor[1] + vector[1]
-	v := anchor[0] + vector[0]
-
-	hinv := anchor[1] + vector[1]*-1
-	vinv := anchor[0] + vector[0]*-1
-
-	if !isInBounds([]int{v, h}) || !isInBounds([]int{vinv, hinv}) {
-		return false
-	} else {
-		char := string(lines[v][h])
-		charinv := string(lines[vinv][hinv])
-		if char == "M" && charinv == "S" {
-			return true
-		} else {
-			return false
+		if isValid {
+			sum += findCenter(&update)
 		}
 	}
+	return sum
 }
 
-func isInBounds(pos []int) bool {
-	// fmt.Printf("Checking [%d,%d]\n", pos[1], pos[0])
-	if pos[0] < 0 || pos[0] > len(lines[0])-1 {
-		// fmt.Printf("[%d,%d] is out of bounds\n", pos[1], pos[0])
-		return false
-	}
-	if pos[1] < 0 || pos[1] > len(lines)-1 {
-		// fmt.Printf("[%d,%d] is out of bounds\n", pos[1], pos[0])
-		return false
-	}
-	return true
+func findCenter(update *[]int) int {
+	idx := (len(*update) - 1) / 2
+	return (*update)[idx]
 }
 
 func main() {
 
 	// safeCount := 0
-	lines = []string{}
-	directions = [][]int{
-		{-1, 1},  // up right
-		{1, 1},   // btm right
-		{1, -1},  // btm left
-		{-1, -1}, // up left
-	}
+	raw_pages := []string{}
+	raw_updates := []string{}
+
+	pages := [][]int{}
+	updates := [][]int{}
+
+	readUpdates := false
 
 	// filePath := "example.txt"
 	filePath := "data_a"
 	// filePath := "data_b"
 
 	err := filereader.ReadFileLineByLine(filePath, func(line string) error {
-		lines = append(lines, line)
+		if line == "" {
+			readUpdates = true
+		}
+		if !readUpdates {
+			raw_pages = append(raw_pages, line)
+		} else {
+			raw_updates = append(raw_updates, line)
+		}
 		return nil
 	})
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 	}
 
-	xmass := findWords()
+	splitPages(&raw_pages, &pages)
+	splitUpdates(&raw_updates, &updates)
 
-	// fmt.Printf("%c\n", lines[0][3])
-	fmt.Printf("Found %d words", xmass)
+	tally := checkUpdates(&updates, &pages)
+
+	// fmt.Printf("%v\n", pages)
+	// fmt.Printf("%v\n", updates)
+	fmt.Printf("Total tally of valid updates' center pages is %d", tally)
 }
