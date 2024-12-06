@@ -3,117 +3,135 @@ package main
 import (
 	"fmt"
 	"slices"
-	"strconv"
-	"strings"
 
 	"github.com/Gavin152/aoc24/internal/filereader"
 )
 
-func splitPages(raw *[]string, split *[][]int) {
-	for _, line := range *raw {
-		s := strings.Split(line, "|")
-		first, _ := strconv.Atoi(s[0])
-		second, _ := strconv.Atoi(s[1])
-		*split = append(*split, []int{first, second})
-	}
-}
+var directions map[rune][]int
+var startPoint []int
+var startDirection rune
 
-func splitUpdates(raw *[]string, split *[][]int) {
-	for _, line := range *raw {
-		s := strings.Split(line, ",")
-		p := []int{}
-		for _, num := range s {
-			parsed, _ := strconv.Atoi(num)
-			p = append(p, parsed)
-		}
-		*split = append(*split, p)
+func fillMatrix(lines []string) [][]rune {
+	xlen := len(lines[0])
+	ylen := len(lines)
+	lab := make([][]rune, xlen)
+	for i, _ := range lab {
+		lab[i] = make([]rune, ylen)
 	}
-}
 
-func checkUpdates(updates *[][]int, rules *[][]int) int {
-	sum := 0
-	for _, update := range *updates {
-		isValid, breaking_rule := checkUpdate(&update, rules)
-		for !isValid {
-			reordered := reorder(&update, breaking_rule)
-			isValid, breaking_rule = checkUpdate(&reordered, rules)
-			if isValid {
-				sum += findCenter(&reordered)
-				break
+	fmt.Printf("lab length: %d, lab element length: %d\n", len(lab), len(lab[0]))
+	for i, line := range lines {
+		col := []rune(line)
+		for j, character := range col {
+			// fmt.Printf("i: %d, j: %d\n", i, j)
+			lab[j][i] = character
+			if slices.Index([]rune{'^', '>', 'v', '<'}, character) > -1 {
+				startPoint = []int{j, i}
+				startDirection = character
 			}
 		}
 	}
-	return sum
+	return lab
 }
 
-func checkUpdate(update *[]int, rules *[][]int) (bool, []int) {
-	for _, rule := range *rules {
-		u_index1 := slices.Index(*update, rule[0])
-		u_index2 := slices.Index(*update, rule[1])
-		if u_index1 == -1 || u_index2 == -1 {
+func walk(lab [][]rune) {
+	current := startPoint
+	direction := startDirection
+	fmt.Printf("Startpoint is %d|%d, direction %c\n", current[0], current[1], direction)
+	for {
+		lab[current[0]][current[1]] = 'X'
+		next := []int{
+			current[0] + directions[direction][0],
+			current[1] + directions[direction][1],
+		}
+		if isOutOfBounds(lab, next) {
+			break
+		}
+		if lab[next[0]][next[1]] == '#' {
+			direction = turn(direction)
 			continue
 		}
-		if !(u_index1 < u_index2) {
-			return false, rule
+		current = next
+	}
+}
+
+func turn(current rune) rune {
+	if current == '^' {
+		return '>'
+	}
+	if current == '>' {
+		return 'v'
+	}
+	if current == 'v' {
+		return '<'
+	}
+	return '^'
+
+}
+
+func isOutOfBounds(lab [][]rune, pos []int) bool {
+	x := pos[0]
+	y := pos[1]
+
+	if x < 0 || x >= len(lab) {
+		return true
+	}
+	if y < 0 || y >= len(lab[0]) {
+		return true
+	}
+	return false
+}
+
+func tallyPositions(lab [][]rune) int {
+	tally := 0
+	for i, col := range lab {
+		for j, _ := range col {
+			if lab[i][j] == 'X' {
+				tally++
+			}
 		}
 	}
-	return true, nil
+	return tally
 }
 
-func reorder(update *[]int, breaking_rule []int) []int {
-	// fmt.Printf("Broken Update: %v\n", update)
-	// fmt.Printf("Broken by rule: %v\n", breaking_rule)
-	idx := slices.Index(*update, breaking_rule[1])
-	tmp_update := slices.Delete(*update, idx, idx+1)
-	tmp_update = slices.Insert(tmp_update, len(tmp_update), breaking_rule[1])
-	// fmt.Printf("Temp Update: %v\n", tmp_update)
-
-	// fmt.Println("\n==============================")
-
-	return tmp_update
-}
-
-func findCenter(update *[]int) int {
-	idx := (len(*update) - 1) / 2
-	return (*update)[idx]
+func printLab(lab [][]rune) {
+	for i, col := range lab {
+		for j, _ := range col {
+			fmt.Printf("%s", string(lab[j][i]))
+		}
+		fmt.Printf("\n")
+	}
+	fmt.Printf("\n")
 }
 
 func main() {
 
-	// safeCount := 0
-	raw_pages := []string{}
-	raw_updates := []string{}
-
-	pages := [][]int{}
-	updates := [][]int{}
-
-	readUpdates := false
-
+	directions = map[rune][]int{
+		'^': []int{0, -1},
+		'>': []int{1, 0},
+		'v': []int{0, 1},
+		'<': []int{-1, 0},
+	}
 	// filePath := "example.txt"
 	filePath := "data_a"
 	// filePath := "data_b"
 
+	lines := []string{}
+
 	err := filereader.ReadFileLineByLine(filePath, func(line string) error {
-		if line == "" {
-			readUpdates = true
-		}
-		if !readUpdates {
-			raw_pages = append(raw_pages, line)
-		} else {
-			raw_updates = append(raw_updates, line)
-		}
+		lines = append(lines, line)
 		return nil
 	})
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 	}
 
-	splitPages(&raw_pages, &pages)
-	splitUpdates(&raw_updates, &updates)
+	lab := fillMatrix(lines)
+	fmt.Printf("%s", string(lab[4]))
+	walk(lab)
 
-	tally := checkUpdates(&updates, &pages)
+	total := tallyPositions(lab)
+	printLab(lab)
 
-	// fmt.Printf("%v\n", pages)
-	// fmt.Printf("%v\n", updates)
-	fmt.Printf("Total tally of valid updates' center pages is %d", tally)
+	fmt.Printf("The guard visited %d positions\n", total)
 }
