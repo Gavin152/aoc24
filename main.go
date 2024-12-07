@@ -66,7 +66,7 @@ func setMarker(pos []int, direction rune) bool {
 	ps := strconv.Itoa(pos[0]) + "|" + strconv.Itoa(pos[1])
 	dirs, exists := visited[ps]
 	if exists && slices.Index(dirs, direction) > -1 {
-		fmt.Printf("Already travelled this field in this direction\n")
+		// fmt.Printf("Already travelled this field in this direction\n")
 		return true
 	}
 	visited[ps] = append(visited[ps], direction)
@@ -165,10 +165,10 @@ func main() {
 		lab[pos[0]][pos[1]] = 'X'
 	}
 
-	total := tallyPositions()
+	tallyPositions()
 	printLab()
 
-	fmt.Printf("The guard visited %d positions\n", total)
+	// fmt.Printf("The guard visited %d positions\n", total)
 	fmt.Printf("The guard visited %d positions\n", len(visited))
 
 	fmt.Printf("Possible Obstruction Positions %d\n", len(possibleObs))
