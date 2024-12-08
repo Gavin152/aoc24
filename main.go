@@ -2,176 +2,143 @@ package main
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/Gavin152/aoc24/internal/filereader"
 )
 
-var directions map[rune][]int
-var startPoint []int
-var startDirection rune
-var lab [][]rune
-var visited map[string][]rune
+type Line struct {
+	result      int
+	factors     []int
+	solvable    bool
+	calculation string
+}
 
-func fillMatrix(lines []string) {
-	xlen := len(lines[0])
-	ylen := len(lines)
-	lab = make([][]rune, xlen)
-	for i, _ := range lab {
-		lab[i] = make([]rune, ylen)
+func dissectLine(line string) (Line, error) {
+	// Split into result and factors parts
+	parts := strings.Split(line, ":")
+	if len(parts) != 2 {
+		return Line{}, fmt.Errorf("invalid line format: missing colon separator")
 	}
 
-	// fmt.Printf("lab length: %d, lab element length: %d\n", len(lab), len(lab[0]))
-	for i, line := range lines {
-		col := []rune(line)
-		for j, character := range col {
-			// fmt.Printf("i: %d, j: %d\n", i, j)
-			lab[j][i] = character
-			if slices.Index([]rune{'^', '>', 'v', '<'}, character) > -1 {
-				startPoint = []int{j, i}
-				startDirection = character
+	// Parse result
+	result, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+	if err != nil {
+		return Line{}, fmt.Errorf("invalid result: %v", err)
+	}
+
+	// Parse factors
+	factorStrs := strings.Fields(parts[1])
+	factors := make([]int, 0, len(factorStrs))
+
+	for _, f := range factorStrs {
+		factor, err := strconv.Atoi(f)
+		if err != nil {
+			return Line{}, fmt.Errorf("invalid factor: %v", err)
+		}
+		factors = append(factors, factor)
+	}
+
+	return Line{
+		result:      result,
+		factors:     factors,
+		solvable:    false,
+		calculation: "",
+	}, nil
+}
+
+func solveLine(line *Line) {
+	fmt.Printf("===========================\nSolving line: %v\n", line)
+	// Try all possible combinations of operators between factors
+	numFactors := len(line.factors)
+	if numFactors < 2 && line.result == line.factors[0] {
+		line.solvable = true
+		return
+	}
+
+	// Generate all possible operator combinations
+	numOperators := numFactors - 1
+	maxCombinations := 1 << (numOperators * 2) // 3 operators need 2 bits each
+
+	for i := 0; i < maxCombinations; i++ {
+		// Build operator sequence from binary representation
+		operators := make([]string, numOperators)
+		for j := 0; j < numOperators; j++ {
+			// Use 2 bits to represent 3 operators
+			bits := (i >> (j * 2)) & 3
+
+			switch bits {
+			case 0:
+				operators[j] = "+"
+			case 1:
+				operators[j] = "*"
+			case 2, 3:
+				operators[j] = "||"
+			default:
+				fmt.Printf("Invalid operator: %d\n", bits)
 			}
 		}
-	}
-}
+		// fmt.Printf("Num Operators: %d\n", numOperators)
+		// fmt.Printf("Operators: %v\n", operators)
 
-func walk() bool {
-	current := startPoint
-	direction := startDirection
-	// fmt.Printf("Startpoint is %d|%d, direction %c\n", current[0], current[1], direction)
-	for {
-		lab[current[0]][current[1]] = 'X'
-		isLoop := setMarker(current, direction)
-		if isLoop {
-			return true
-		}
-		next := []int{
-			current[0] + directions[direction][0],
-			current[1] + directions[direction][1],
-		}
-		if isOutOfBounds(lab, next) {
-			break
-		}
-		if lab[next[0]][next[1]] == '#' || lab[next[0]][next[1]] == 'O' {
-			direction = turn(direction)
-			continue
-		}
-		current = next
-	}
-	return false
-}
-
-func setMarker(pos []int, direction rune) bool {
-	ps := strconv.Itoa(pos[0]) + "|" + strconv.Itoa(pos[1])
-	dirs, exists := visited[ps]
-	if exists && slices.Index(dirs, direction) > -1 {
-		// fmt.Printf("Already travelled this field in this direction\n")
-		return true
-	}
-	visited[ps] = append(visited[ps], direction)
-	return false
-}
-
-func turn(current rune) rune {
-	if current == '^' {
-		return '>'
-	}
-	if current == '>' {
-		return 'v'
-	}
-	if current == 'v' {
-		return '<'
-	}
-	return '^'
-
-}
-
-func isOutOfBounds(lab [][]rune, pos []int) bool {
-	x := pos[0]
-	y := pos[1]
-
-	if x < 0 || x >= len(lab) {
-		return true
-	}
-	if y < 0 || y >= len(lab[0]) {
-		return true
-	}
-	return false
-}
-
-func tallyPositions() [][]int {
-	tally := [][]int{}
-	for i, col := range lab {
-		for j, _ := range col {
-			if lab[i][j] == 'X' {
-				tally = append(tally, []int{i, j})
+		// Build calculation string as we go
+		calcStr := strconv.Itoa(line.factors[0])
+		result := line.factors[0]
+		for j := 0; j < numOperators; j++ {
+			switch operators[j] {
+			case "+":
+				result += line.factors[j+1]
+				calcStr += " + " + strconv.Itoa(line.factors[j+1])
+			case "*":
+				result *= line.factors[j+1]
+				calcStr += " * " + strconv.Itoa(line.factors[j+1])
+			case "||":
+				// Convert current result and next factor to strings and concatenate
+				resultStr := strconv.Itoa(result)
+				nextStr := strconv.Itoa(line.factors[j+1])
+				concatenated, _ := strconv.Atoi(resultStr + nextStr)
+				result = concatenated
+				calcStr += " || " + strconv.Itoa(line.factors[j+1])
 			}
 		}
-	}
-	return tally
-}
 
-func printLab() {
-	for i, col := range lab {
-		for j, _ := range col {
-			fmt.Printf("%s", string(lab[j][i]))
+		if result == line.result {
+			line.solvable = true
+			line.calculation = strconv.Itoa(result) + ":  " + calcStr
+			fmt.Printf("%v\n", line.calculation)
+			return
 		}
-		fmt.Printf("\n")
 	}
-	fmt.Printf("\n")
 }
 
 func main() {
 
-	directions = map[rune][]int{
-		'^': []int{0, -1},
-		'>': []int{1, 0},
-		'v': []int{0, 1},
-		'<': []int{-1, 0},
-	}
-	visited = map[string][]rune{}
-
-	possibleObs := [][]int{}
-	confirmedObs := [][]int{}
-
 	// filePath := "example.txt"
 	filePath := "data"
 
-	lines := []string{}
+	solvableLines := []Line{}
 
 	err := filereader.ReadFileLineByLine(filePath, func(line string) error {
-		lines = append(lines, line)
+		dissected, err := dissectLine(line)
+		if err != nil {
+			return err
+		}
+		solveLine(&dissected)
+		if dissected.solvable {
+			solvableLines = append(solvableLines, dissected)
+		}
 		return nil
 	})
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 	}
 
-	fillMatrix(lines)
-	walk()
-	possibleObs = tallyPositions()
-
-	for _, pos := range possibleObs {
-		fillMatrix(lines)
-		for k := range visited {
-			delete(visited, k)
-		}
-		lab[pos[0]][pos[1]] = 'O'
-		isLooped := walk()
-		if isLooped {
-			confirmedObs = append(confirmedObs, pos)
-		}
-		lab[pos[0]][pos[1]] = 'X'
+	sum := 0
+	for _, line := range solvableLines {
+		sum += line.result
 	}
 
-	tallyPositions()
-	printLab()
-
-	// fmt.Printf("The guard visited %d positions\n", total)
-	fmt.Printf("The guard visited %d positions\n", len(visited))
-
-	fmt.Printf("Possible Obstruction Positions %d\n", len(possibleObs))
-	fmt.Printf("Confirmed Obstruction Positions %d\n", len(confirmedObs))
-
+	fmt.Printf("Sum of solvable lines: %d\n", sum)
+	fmt.Printf("Solvable Lines %d\n", len(solvableLines))
 }
