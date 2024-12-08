@@ -8,137 +8,132 @@ import (
 	"github.com/Gavin152/aoc24/internal/filereader"
 )
 
-type Line struct {
-	result      int
-	factors     []int
-	solvable    bool
-	calculation string
+var grid [][]rune
+var antinodes map[string]bool
+
+func linesToGrid(lines []string) [][]rune {
+	// First dimension is Y (rows), second is X (columns)
+	height := len(lines)
+	width := len(lines[0]) // Assumes all lines have same width
+	
+	grid := make([][]rune, height)
+	for y := range grid {
+		grid[y] = make([]rune, width)
+		for x := range lines[y] {
+			grid[y][x] = rune(lines[y][x])
+		}
+	}
+	return grid
 }
 
-func dissectLine(line string) (Line, error) {
-	// Split into result and factors parts
-	parts := strings.Split(line, ":")
-	if len(parts) != 2 {
-		return Line{}, fmt.Errorf("invalid line format: missing colon separator")
+func fillMatrix(lines []string) {
+	xlen := len(lines[0])
+	ylen := len(lines)
+	grid = make([][]rune, xlen)
+	for i, _ := range grid {
+		grid[i] = make([]rune, ylen)
 	}
 
-	// Parse result
-	result, err := strconv.Atoi(strings.TrimSpace(parts[0]))
-	if err != nil {
-		return Line{}, fmt.Errorf("invalid result: %v", err)
-	}
-
-	// Parse factors
-	factorStrs := strings.Fields(parts[1])
-	factors := make([]int, 0, len(factorStrs))
-
-	for _, f := range factorStrs {
-		factor, err := strconv.Atoi(f)
-		if err != nil {
-			return Line{}, fmt.Errorf("invalid factor: %v", err)
+	// fmt.Printf("lab length: %d, lab element length: %d\n", len(lab), len(lab[0]))
+	for i, line := range lines {
+		col := []rune(line)
+		for j, character := range col {
+			// fmt.Printf("i: %d, j: %d\n", i, j)
+			grid[j][i] = character
 		}
-		factors = append(factors, factor)
 	}
-
-	return Line{
-		result:      result,
-		factors:     factors,
-		solvable:    false,
-		calculation: "",
-	}, nil
 }
 
-func solveLine(line *Line) {
-	fmt.Printf("===========================\nSolving line: %v\n", line)
-	// Try all possible combinations of operators between factors
-	numFactors := len(line.factors)
-	if numFactors < 2 && line.result == line.factors[0] {
-		line.solvable = true
-		return
+func printGrid() {
+	anodes := [][]int{}
+	// fmt.Printf("Antinodes: %v\n", antinodes)
+	for k := range antinodes {
+		coords := strings.Split(k, "|")
+		x, _ := strconv.Atoi(coords[0])
+		y, _ := strconv.Atoi(coords[1])
+		anodes = append(anodes, []int{x, y})
 	}
-
-	// Generate all possible operator combinations
-	numOperators := numFactors - 1
-	maxCombinations := 1 << (numOperators * 2) // 3 operators need 2 bits each
-
-	for i := 0; i < maxCombinations; i++ {
-		// Build operator sequence from binary representation
-		operators := make([]string, numOperators)
-		for j := 0; j < numOperators; j++ {
-			// Use 2 bits to represent 3 operators
-			bits := (i >> (j * 2)) & 3
-
-			switch bits {
-			case 0:
-				operators[j] = "+"
-			case 1:
-				operators[j] = "*"
-			case 2, 3:
-				operators[j] = "||"
-			default:
-				fmt.Printf("Invalid operator: %d\n", bits)
+	fmt.Printf("\n")
+	for i, col := range grid {
+		for j, _ := range col {
+			if containsCoord(anodes, []int{j, i}) {
+				fmt.Printf("#")
+			} else {
+				fmt.Printf("%s", string(grid[j][i]))
 			}
 		}
-		// fmt.Printf("Num Operators: %d\n", numOperators)
-		// fmt.Printf("Operators: %v\n", operators)
+		fmt.Printf("\n")
+	}
+	fmt.Printf("\n")
+}
 
-		// Build calculation string as we go
-		calcStr := strconv.Itoa(line.factors[0])
-		result := line.factors[0]
-		for j := 0; j < numOperators; j++ {
-			switch operators[j] {
-			case "+":
-				result += line.factors[j+1]
-				calcStr += " + " + strconv.Itoa(line.factors[j+1])
-			case "*":
-				result *= line.factors[j+1]
-				calcStr += " * " + strconv.Itoa(line.factors[j+1])
-			case "||":
-				// Convert current result and next factor to strings and concatenate
-				resultStr := strconv.Itoa(result)
-				nextStr := strconv.Itoa(line.factors[j+1])
-				concatenated, _ := strconv.Atoi(resultStr + nextStr)
-				result = concatenated
-				calcStr += " || " + strconv.Itoa(line.factors[j+1])
+func isInBounds(coord []int) bool {
+	return coord[0] >= 0 && coord[0] < len(grid[0]) && coord[1] >= 0 && coord[1] < len(grid)
+}
+
+func getAntinodes(coord []int) [][]int {
+	anodes := [][]int{}
+	character := grid[coord[0]][coord[1]]
+	for x, row := range grid {
+		for y, _ := range row {
+			if grid[x][y] == character && !(x == coord[0] && y == coord[1]) {
+				vecX := x - coord[0]
+				vecY := y - coord[1]
+				newNode := []int{coord[0]-vecX, coord[1]-vecY}
+				for isInBounds(newNode) {
+					anodes = append(anodes, newNode)
+					newNode[0] -= vecX
+					newNode[1] -= vecY
+				}
 			}
 		}
+	}
 
-		if result == line.result {
-			line.solvable = true
-			line.calculation = strconv.Itoa(result) + ":  " + calcStr
-			fmt.Printf("%v\n", line.calculation)
-			return
+	// fmt.Printf("================================\n")
+	return anodes
+}
+
+func containsCoord(anodes [][]int, coord []int) bool {
+	for _, anode := range anodes {
+		if anode[0] == coord[0] && anode[1] == coord[1] {
+			return true
 		}
 	}
+	return false
 }
 
 func main() {
 
-	// filePath := "example.txt"
-	filePath := "data"
+	filePath := "example.txt"
+	// filePath := "data"
 
-	solvableLines := []Line{}
+	antinodes = make(map[string]bool)
 
+	lines := []string{}
 	err := filereader.ReadFileLineByLine(filePath, func(line string) error {
-		dissected, err := dissectLine(line)
-		if err != nil {
-			return err
-		}
-		solveLine(&dissected)
-		if dissected.solvable {
-			solvableLines = append(solvableLines, dissected)
-		}
+		lines = append(lines, line)
+		grid = append(grid, []rune(line))
+		
 		return nil
 	})
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 	}
 
-	sum := 0
-	for _, line := range solvableLines {
-		sum += line.result
+	fillMatrix(lines)
+	for x, row := range grid {
+		for y, _ := range row {
+			if grid[x][y] != '.' {
+				anodes := getAntinodes([]int{x, y})
+				for _, anode := range anodes {
+					antinodes[fmt.Sprintf("%d|%d", anode[0], anode[1])] = true
+				}
+			}
+		}
 	}
 
-	fmt.Printf("Sum of solvable lines: %d\n", sum)
-	fmt.Printf("Solvable Lines %d\n", len(solvableLines))
+
+	fmt.Printf("Antinodes: %v\n", len(antinodes))
+	// fmt.Printf("Antinodes:asdfa %v\n\n", antinodes)
+	printGrid()
 }
