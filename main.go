@@ -79,11 +79,12 @@ func getAntinodes(coord []int) [][]int {
 			if grid[x][y] == character && !(x == coord[0] && y == coord[1]) {
 				vecX := x - coord[0]
 				vecY := y - coord[1]
-				newNode := []int{coord[0]-vecX, coord[1]-vecY}
-				for isInBounds(newNode) {
+				for i := 0; true; i++ {
+					newNode := []int{coord[0]-vecX*i, coord[1]-vecY*i}
+					if !isInBounds(newNode) {
+						break
+					}
 					anodes = append(anodes, newNode)
-					newNode[0] -= vecX
-					newNode[1] -= vecY
 				}
 			}
 		}
@@ -104,8 +105,8 @@ func containsCoord(anodes [][]int, coord []int) bool {
 
 func main() {
 
-	filePath := "example.txt"
-	// filePath := "data"
+	// filePath := "example.txt"
+	filePath := "data"
 
 	antinodes = make(map[string]bool)
 
