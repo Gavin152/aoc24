@@ -8,133 +8,94 @@ import (
 	"github.com/Gavin152/aoc24/internal/filereader"
 )
 
-var grid [][]rune
-var antinodes map[string]bool
-
-func linesToGrid(lines []string) [][]rune {
-	// First dimension is Y (rows), second is X (columns)
-	height := len(lines)
-	width := len(lines[0]) // Assumes all lines have same width
-	
-	grid := make([][]rune, height)
-	for y := range grid {
-		grid[y] = make([]rune, width)
-		for x := range lines[y] {
-			grid[y][x] = rune(lines[y][x])
+func unpack(line string) string {
+	blocks := strings.Split(line, "")
+	blockString := ""
+	idx := 0
+	for i, block := range blocks {
+		bump := true
+		blockSize, _ := strconv.Atoi(block)
+		if blockSize == 0 {
+			idx++
+			continue	
 		}
-	}
-	return grid
-}
-
-func fillMatrix(lines []string) {
-	xlen := len(lines[0])
-	ylen := len(lines)
-	grid = make([][]rune, xlen)
-	for i, _ := range grid {
-		grid[i] = make([]rune, ylen)
-	}
-
-	// fmt.Printf("lab length: %d, lab element length: %d\n", len(lab), len(lab[0]))
-	for i, line := range lines {
-		col := []rune(line)
-		for j, character := range col {
-			// fmt.Printf("i: %d, j: %d\n", i, j)
-			grid[j][i] = character
-		}
-	}
-}
-
-func printGrid() {
-	anodes := [][]int{}
-	// fmt.Printf("Antinodes: %v\n", antinodes)
-	for k := range antinodes {
-		coords := strings.Split(k, "|")
-		x, _ := strconv.Atoi(coords[0])
-		y, _ := strconv.Atoi(coords[1])
-		anodes = append(anodes, []int{x, y})
-	}
-	fmt.Printf("\n")
-	for i, col := range grid {
-		for j, _ := range col {
-			if containsCoord(anodes, []int{j, i}) {
-				fmt.Printf("#")
+		for j := 0; j < blockSize; j++ {
+			if i%2 == 0 {
+				blockString += strconv.Itoa(idx)
 			} else {
-				fmt.Printf("%s", string(grid[j][i]))
-			}
-		}
-		fmt.Printf("\n")
-	}
-	fmt.Printf("\n")
-}
-
-func isInBounds(coord []int) bool {
-	return coord[0] >= 0 && coord[0] < len(grid[0]) && coord[1] >= 0 && coord[1] < len(grid)
-}
-
-func getAntinodes(coord []int) [][]int {
-	anodes := [][]int{}
-	character := grid[coord[0]][coord[1]]
-	for x, row := range grid {
-		for y, _ := range row {
-			if grid[x][y] == character && !(x == coord[0] && y == coord[1]) {
-				vecX := x - coord[0]
-				vecY := y - coord[1]
-				for i := 0; true; i++ {
-					newNode := []int{coord[0]-vecX*i, coord[1]-vecY*i}
-					if !isInBounds(newNode) {
-						break
-					}
-					anodes = append(anodes, newNode)
+				blockString += "."
+				if bump {
+					idx++
+					bump = false
 				}
 			}
 		}
 	}
 
-	// fmt.Printf("================================\n")
-	return anodes
+	return blockString
 }
 
-func containsCoord(anodes [][]int, coord []int) bool {
-	for _, anode := range anodes {
-		if anode[0] == coord[0] && anode[1] == coord[1] {
-			return true
+func findLastDigit(runes []rune, pos int) (digit rune, index int) {
+	for i := len(runes) - 1; i >= 0; i-- {
+		if i < pos {
+			break
+		}
+		if runes[i] != '.' {
+			// fmt.Printf("Found digit %c at index %d\n", runes[i], i)
+			return runes[i], i
 		}
 	}
-	return false
+	return -1, pos
+}
+
+func defrag(line string) string {
+	raw_blocks := []rune(line)
+	new_blocks := []rune(line)
+	for i := 0; i < len(raw_blocks); i++ {
+		if raw_blocks[i] != '.' {
+			continue
+		} else {
+			lastDigit, lastIndex := findLastDigit(raw_blocks, i)
+			if lastDigit != -1 {
+				new_blocks[i] = lastDigit
+				raw_blocks[lastIndex] = '.'
+			}
+			new_blocks[lastIndex] = '.'
+		}
+	}
+	return string(new_blocks)
+}
+
+func calculateChecksum(line string) int {
+	blocks := strings.Split(line, "")
+	checksum := 0
+	for i, block := range blocks {
+		blockNum, _ := strconv.Atoi(block)
+		checksum += blockNum * i
+	}
+	return checksum
 }
 
 func main() {
 
-	// filePath := "example.txt"
-	filePath := "data"
+	filePath := "example.txt"
+	// filePath := "data"
 
-	antinodes = make(map[string]bool)
+	checksum := 0
+	unpacked := ""
+	defragged := ""
 
-	lines := []string{}
 	err := filereader.ReadFileLineByLine(filePath, func(line string) error {
-		lines = append(lines, line)
-		grid = append(grid, []rune(line))
-		
+		unpacked = unpack(line)
+		defragged = defrag(unpacked)
+		checksum += calculateChecksum(defragged)
 		return nil
 	})
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 	}
 
-	fillMatrix(lines)
-	for x, row := range grid {
-		for y, _ := range row {
-			if grid[x][y] != '.' {
-				anodes := getAntinodes([]int{x, y})
-				for _, anode := range anodes {
-					antinodes[fmt.Sprintf("%d|%d", anode[0], anode[1])] = true
-				}
-			}
-		}
-	}
-
-
-	fmt.Printf("Antinodes: %v\n", len(antinodes))
-	// fmt.Printf("Antinodes:asdfa %v\n\n", antinodes)
-	printGrid()
+	fmt.Printf("Unpacked: %s\n", unpacked)
+	fmt.Printf("Defragged: %s\n", defragged)
+	fmt.Printf("Checksum: %d\n", checksum)
 }
