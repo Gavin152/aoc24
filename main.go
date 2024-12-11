@@ -2,15 +2,16 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/Gavin152/aoc24/internal/filereader"
 )
 
-func unpack(line string) string {
+func unpack(line string) []int {
 	blocks := strings.Split(line, "")
-	blockString := ""
+	blockString := []int{}
 	idx := 0
 	for i, block := range blocks {
 		bump := true
@@ -21,9 +22,9 @@ func unpack(line string) string {
 		}
 		for j := 0; j < blockSize; j++ {
 			if i%2 == 0 {
-				blockString += strconv.Itoa(idx)
+				blockString = append(blockString, idx)
 			} else {
-				blockString += "."
+				blockString = append(blockString, -1)
 				if bump {
 					idx++
 					bump = false
@@ -35,12 +36,12 @@ func unpack(line string) string {
 	return blockString
 }
 
-func findLastDigit(runes []rune, pos int) (digit rune, index int) {
+func findLastDigit(runes []int, pos int) (digit int, index int) {
 	for i := len(runes) - 1; i >= 0; i-- {
 		if i < pos {
 			break
 		}
-		if runes[i] != '.' {
+		if runes[i] != -1 {
 			// fmt.Printf("Found digit %c at index %d\n", runes[i], i)
 			return runes[i], i
 		}
@@ -48,42 +49,46 @@ func findLastDigit(runes []rune, pos int) (digit rune, index int) {
 	return -1, pos
 }
 
-func defrag(line string) string {
-	raw_blocks := []rune(line)
-	new_blocks := []rune(line)
+func defrag(line []int) []int {
+	raw_blocks := line
+	new_blocks := line
 	for i := 0; i < len(raw_blocks); i++ {
-		if raw_blocks[i] != '.' {
+		if raw_blocks[i] != -1 {
 			continue
 		} else {
 			lastDigit, lastIndex := findLastDigit(raw_blocks, i)
 			if lastDigit != -1 {
 				new_blocks[i] = lastDigit
-				raw_blocks[lastIndex] = '.'
+				raw_blocks[lastIndex] = -1
 			}
-			new_blocks[lastIndex] = '.'
+			new_blocks[lastIndex] = -1
 		}
 	}
-	return string(new_blocks)
+	cleaned := slices.DeleteFunc(new_blocks, func(r int) bool {
+		return r == -1
+	})
+	return cleaned
 }
 
-func calculateChecksum(line string) int {
-	blocks := strings.Split(line, "")
+func calculateChecksum(line []int) int {
 	checksum := 0
-	for i, block := range blocks {
-		blockNum, _ := strconv.Atoi(block)
-		checksum += blockNum * i
+	for i, block := range line {
+		if block == -1 {
+			continue
+		}
+		checksum += block * i
 	}
 	return checksum
 }
 
 func main() {
 
-	filePath := "example.txt"
-	// filePath := "data"
+	// filePath := "example.txt"
+	filePath := "data"
 
 	checksum := 0
-	unpacked := ""
-	defragged := ""
+	unpacked := []int{}
+	defragged := []int{}
 
 	err := filereader.ReadFileLineByLine(filePath, func(line string) error {
 		unpacked = unpack(line)
@@ -95,7 +100,7 @@ func main() {
 		fmt.Printf("Error: %v\n", err)
 	}
 
-	fmt.Printf("Unpacked: %s\n", unpacked)
-	fmt.Printf("Defragged: %s\n", defragged)
+	// fmt.Printf("Unpacked: %v\n", unpacked)
+	// fmt.Printf("Defragged: %v\n", defragged)
 	fmt.Printf("Checksum: %d\n", checksum)
 }
