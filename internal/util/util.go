@@ -9,7 +9,7 @@ func SliceToGrid (lines []string) [][]rune {
 	xlen := len(lines[0])
 	ylen := len(lines)
 	grid := make([][]rune, xlen)
-	for i, _ := range grid {
+	for i := range grid {
 		grid[i] = make([]rune, ylen)
 	}
 
@@ -27,7 +27,7 @@ func ParseGridToInt (grid [][]rune) ([][]int, error) {
 	
 	for i, col := range grid {
 		intcol := []int{}
-		for j, _ := range col {
+		for j:= range col {
 			newInt, err := strconv.Atoi(string(grid[j][i]))
 			if err != nil {
 				newInt = -1
@@ -41,7 +41,7 @@ func ParseGridToInt (grid [][]rune) ([][]int, error) {
 
 func PrintGrid [T any](grid [][]T) {
 	for i, col := range grid {
-		for j, _ := range col {
+		for j := range col {
 			fmt.Printf("%v", grid[j][i])
 		}
 		fmt.Printf("\n")
