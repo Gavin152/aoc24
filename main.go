@@ -92,7 +92,7 @@ func main() {
 			trailSummitsMap[fmt.Sprintf("%d|%d", summit[0], summit[1])] = true
 		}
 		trails[fmt.Sprintf("%d|%d", trailHead[0], trailHead[1])] = len(trailSummitsMap)
-		fullScore += len(trailSummitsMap)
+		fullScore += len(trailSummits)
 		fmt.Printf("Trail Head: %v, Trail Summits: %v\n", trailHead, trailSummitsMap)
 	}
 
