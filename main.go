@@ -10,6 +10,35 @@ import (
 
 var stones []int
 
+type StoneBlinkRes struct {
+	Value 	int
+	Blinks 	int
+}
+
+var bCache = make(map[StoneBlinkRes]int)
+
+func cblink(stone int, blinks int) int {
+	if val, ok := bCache[StoneBlinkRes{Value: stone, Blinks: blinks}]; ok {
+		return val
+	}
+	if blinks == 0 {
+		return 1
+	}
+	if stone == 0 {
+		return cblink(1, blinks-1)
+	}
+	if splitable := strconv.Itoa(stone); len(splitable) % 2 == 0 {
+		left, right := splitStone(stone)
+		created := cblink(left, blinks-1) + cblink(right, blinks-1)
+		bCache[StoneBlinkRes{Value: stone, Blinks: blinks}] = created
+		return created
+	} else {
+		created := cblink(stone * 2024, blinks-1)
+		bCache[StoneBlinkRes{Value: stone, Blinks: blinks}] = created
+		return created
+	}
+}
+
 func blink(stones []int) []int {
 	newStones := []int{}
 	if len(stones) > 100 {
@@ -75,21 +104,10 @@ func main() {
 	fmt.Println(stones)
 
 	totalStones := 0
-
-	for s, stone := range stones {
-		stonearr := []int{stone}
-
-		for i := 0; i < 75; i++ {
-			newArr := []int{}
-			for _, stone := range stonearr {
-				newArr = append(newArr, blink([]int{stone})...)
-			}
-			stonearr = newArr
-			fmt.Printf("After %d blinks, stone %d stones was split into %d stones\n", i+1, s+1, len(stonearr))
-		}
-		fmt.Printf("Stone %d: %d\n", s, len(stones))
-		totalStones += len(stones)
+	for _, stone := range stones {
+		totalStones += cblink(stone, 75)
 	}
 
-	fmt.Printf("The total number of stones is %d\n", len(stones))
+	fmt.Println(bCache)
+	fmt.Printf("The total number of stones is %d\n", totalStones)
 }
