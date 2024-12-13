@@ -10,21 +10,27 @@ import (
 
 var stones []int
 
-func blink() {
+func blink(stones []int) []int {
 	newStones := []int{}
-	for _, stone := range stones {
-		splitable := splitable(stone)
-		if stone == 0 {
-			newStones = append(newStones, 1)
-		} else if splitable {
-			left, right := splitStone(stone)
-			newStones = append(newStones, left)
-			newStones = append(newStones, right)
-		} else {
-			newStones = append(newStones, stone * 2024)
+	if len(stones) > 100 {
+		for _, stone := range stones {
+			newStones = append(newStones, blink([]int{stone})...)
+		}
+	} else {
+		for _, stone := range stones {
+			splitable := splitable(stone)
+			if stone == 0 {
+				newStones = append(newStones, 1)
+			} else if splitable {
+				left, right := splitStone(stone)
+				newStones = append(newStones, left)
+				newStones = append(newStones, right)
+			} else {
+				newStones = append(newStones, stone * 2024)
+			}
 		}
 	}
-	stones = newStones
+	return newStones
 }
 
 func splitable(stone int) bool {
@@ -68,10 +74,21 @@ func main() {
 
 	fmt.Println(stones)
 
-	for i := 0; i < 25; i++ {
-		blink()
-		// fmt.Println(stones)
-		// fmt.Println("======================================")
+	totalStones := 0
+
+	for s, stone := range stones {
+		stonearr := []int{stone}
+
+		for i := 0; i < 75; i++ {
+			newArr := []int{}
+			for _, stone := range stonearr {
+				newArr = append(newArr, blink([]int{stone})...)
+			}
+			stonearr = newArr
+			fmt.Printf("After %d blinks, stone %d stones was split into %d stones\n", i+1, s+1, len(stonearr))
+		}
+		fmt.Printf("Stone %d: %d\n", s, len(stones))
+		totalStones += len(stones)
 	}
 
 	fmt.Printf("The total number of stones is %d\n", len(stones))
