@@ -8,110 +8,170 @@ import (
 	"github.com/Gavin152/aoc24/internal/filereader"
 )
 
-type Button struct {
-	X int
-	Y int
-	Cost int
-	Count int
+type Robot struct {
+	PX int
+	PY int
+	VX int
+	VY int
 }
 
-type clawMachine struct {
-	A Button
-	B Button
-	X int
-	Y int
-	Cost int
-	Winable bool
+type Quadrant struct {
+	MinX int
+	MinY int
+	MaxX int
+	MaxY int
+	RobotCount int
 }
 
-func parseBlock(lines []string) clawMachine {
-	machine := clawMachine{}
-	for _, line := range lines {
-		parts := strings.Split(strings.TrimSpace(line), " ")
-		if strings.HasPrefix(line, "Button") {
-			xParts := strings.Split(parts[2], "+")
-			yParts := strings.Split(parts[3], "+")
-			x, _ := strconv.Atoi(strings.TrimSuffix(xParts[1], ","))
-			y, _ := strconv.Atoi(strings.TrimSpace(yParts[1]))
-			if strings.HasPrefix(line, "Button A") {
-				machine.A = Button{X: x, Y: y, Cost: 3, Count: 0}
-			} else if strings.HasPrefix(line, "Button B") {
-				machine.B = Button{X: x, Y: y, Cost: 1, Count: 0}
+var robots = []Robot{}
+var maxX = 11
+var maxY = 7
+var q1 = Quadrant{}
+var q2 = Quadrant{}
+var q3 = Quadrant{}
+var q4 = Quadrant{}
+
+func parseLine(line string) Robot {
+	params := strings.Split(line, " ")
+	pos := strings.Split(strings.Split(params[0], "=")[1], ",")
+	vel := strings.Split(strings.Split(params[1], "=")[1], ",")
+
+	px, _ := strconv.Atoi(pos[0])
+	py, _ := strconv.Atoi(pos[1])
+	vx, _ := strconv.Atoi(vel[0])
+	vy, _ := strconv.Atoi(vel[1])
+
+	return Robot{
+		PX: px,
+		PY: py,
+		VX: vx,
+		VY: vy,
+	}
+}
+
+func move(robot *Robot) {
+	newX := robot.PX + robot.VX
+	newY := robot.PY + robot.VY
+
+	if newX < 0 {
+		newX = maxX + newX
+	}
+	if newX >= maxX {
+		newX = newX - maxX
+	}
+	if newY < 0 {
+		newY = maxY + newY
+	}
+	if newY >= maxY {
+		newY = newY - maxY
+	}
+
+	robot.PX = newX
+	robot.PY = newY
+}
+
+func printGrid() {
+	for y := 0; y < maxY; y++ {
+		for x := 0; x < maxX; x++ {
+			found := 0
+			for _, robot := range robots {
+				if robot.PX == x && robot.PY == y {
+					found++
+				}
 			}
-		} else if strings.HasPrefix(line, "Prize") {
-			xParts := strings.Split(parts[1], "=")
-			yParts := strings.Split(parts[2], "=")
-			x, _ := strconv.Atoi(strings.TrimSuffix(xParts[1], ","))
-			y, _ := strconv.Atoi(strings.TrimSpace(yParts[1]))
-			machine.X = x + 10000000000000
-			machine.Y = y + 10000000000000
+			if found > 0 {
+				fmt.Printf("%d", found)
+			} else {
+				fmt.Printf(".")
+			}
 		}
-	}
-	machine.Winable = false
-	machine.Cost = -1
-	return machine
-}
-
-func solve(machine *clawMachine) {
-	bTimes := (machine.Y * machine.A.X - machine.X * machine.A.Y) / (machine.A.X * machine.B.Y - machine.B.X * machine.A.Y)
-	aTimes := (machine.X - bTimes * machine.B.X) / machine.A.X
-
-	machine.A.Count = aTimes
-	machine.B.Count = bTimes
-	if verify(*machine) {
-		machine.Winable = true
-		machine.Cost = machine.A.Cost * machine.A.Count + machine.B.Cost * machine.B.Count
-	} else {
-		machine.Cost = -1
-		machine.Winable = false
-		machine.A.Count = -1
-		machine.B.Count = -1
+		fmt.Println()
 	}
 }
 
-func verify(machine clawMachine) bool {
-	vx := machine.A.X * machine.A.Count + machine.B.X * machine.B.Count
-	vy := machine.A.Y * machine.A.Count + machine.B.Y * machine.B.Count
-	return vx == machine.X && vy == machine.Y
+func setQuadrants() {
+	q1 = Quadrant{
+		MinX: 0,
+		MinY: 0,
+		MaxX: maxX / 2,
+		MaxY: maxY / 2,
+		RobotCount: 0,
+	}
+	q2 = Quadrant{
+		MinX: maxX / 2 + 1,
+		MinY: 0,
+		MaxX: maxX,
+		MaxY: maxY / 2,
+		RobotCount: 0,
+	}
+	q3 = Quadrant{
+		MinX: 0,
+		MinY: maxY / 2 + 1,
+		MaxX: maxX / 2,
+		MaxY: maxY,
+		RobotCount: 0,
+	}
+	q4 = Quadrant{
+		MinX: maxX / 2 + 1,
+		MinY: maxY / 2 + 1,
+		MaxX: maxX,
+		MaxY: maxY,
+		RobotCount: 0,
+	}
 }
 
 func main() {
 
-	// filePath := "data"
-	filePath := "example"
+	filePath := "data"
+	// filePath := "example"
 
-	arcade := []clawMachine{}
-	lines := []string{}
+	if filePath == "example" {
+		maxX = 11
+		maxY = 7
+	} else {
+		maxX = 101
+		maxY = 103
+	}
+
+	setQuadrants()
 
 	err := filereader.ReadFileLineByLine(filePath, func(line string) error {
-		if line == "" {
-			clawMachine := parseBlock(lines)
-			arcade = append(arcade, clawMachine)
-			lines = []string{}
-		} else {
-			lines = append(lines, line)
-		}
-
+		robot := parseLine(line)
+		robots = append(robots, robot)
 		return nil
 	})
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 	}
 
-	totalCost := 0
-
-	clawMachine := parseBlock(lines)
-	arcade = append(arcade, clawMachine)
-
-	for i, machine := range arcade {
-		solve(&machine)
-		if machine.Winable {
-			if machine.Cost > 0 {
-				fmt.Printf("Machine: %d, %+v\n", i, machine)
-				totalCost += machine.Cost
-			}
+	// printGrid()
+	for i := 0; i < 100; i++ {
+		for r := range robots {
+			// fmt.Printf("Robot %d is at (%d, %d)\n", r, robots[r].PX, robots[r].PY)
+			move(&robots[r])
+			// fmt.Printf("Robot %d moved to (%d, %d)\n", r, robots[r].PX, robots[r].PY)
 		}
 	}
 
-	fmt.Println(totalCost)
+	for _, robot := range robots {
+		if robot.PX >= q1.MinX && robot.PX < q1.MaxX && robot.PY >= q1.MinY && robot.PY < q1.MaxY {
+			q1.RobotCount++
+		}
+		if robot.PX >= q2.MinX && robot.PX < q2.MaxX && robot.PY >= q2.MinY && robot.PY < q2.MaxY {
+			q2.RobotCount++
+		}
+		if robot.PX >= q3.MinX && robot.PX < q3.MaxX && robot.PY >= q3.MinY && robot.PY < q3.MaxY {
+			q3.RobotCount++
+		}
+		if robot.PX >= q4.MinX && robot.PX < q4.MaxX && robot.PY >= q4.MinY && robot.PY < q4.MaxY {
+			q4.RobotCount++
+		}
+	}
+
+	printGrid()
+	fmt.Printf("Q1: %d\n", q1.RobotCount)
+	fmt.Printf("Q2: %d\n", q2.RobotCount)
+	fmt.Printf("Q3: %d\n", q3.RobotCount)
+	fmt.Printf("Q4: %d\n", q4.RobotCount)
+	fmt.Printf("Total: %d\n", q1.RobotCount*q2.RobotCount*q3.RobotCount*q4.RobotCount)
 }
