@@ -43,8 +43,8 @@ func parseBlock(lines []string) clawMachine {
 			yParts := strings.Split(parts[2], "=")
 			x, _ := strconv.Atoi(strings.TrimSuffix(xParts[1], ","))
 			y, _ := strconv.Atoi(strings.TrimSpace(yParts[1]))
-			machine.X = x
-			machine.Y = y
+			machine.X = x + 10000000000000
+			machine.Y = y + 10000000000000
 		}
 	}
 	machine.Winable = false
@@ -70,9 +70,6 @@ func solve(machine *clawMachine) {
 }
 
 func verify(machine clawMachine) bool {
-	if machine.A.Count > 100 || machine.B.Count > 100 {
-		return false
-	}
 	vx := machine.A.X * machine.A.Count + machine.B.X * machine.B.Count
 	vy := machine.A.Y * machine.A.Count + machine.B.Y * machine.B.Count
 	return vx == machine.X && vy == machine.Y
@@ -80,8 +77,8 @@ func verify(machine clawMachine) bool {
 
 func main() {
 
-	filePath := "data"
-	//filePath := "example"
+	// filePath := "data"
+	filePath := "example"
 
 	arcade := []clawMachine{}
 	lines := []string{}
@@ -106,11 +103,13 @@ func main() {
 	clawMachine := parseBlock(lines)
 	arcade = append(arcade, clawMachine)
 
-	fmt.Println(len(arcade))
-	for _, machine := range arcade {
+	for i, machine := range arcade {
 		solve(&machine)
 		if machine.Winable {
-			totalCost += machine.Cost
+			if machine.Cost > 0 {
+				fmt.Printf("Machine: %d, %+v\n", i, machine)
+				totalCost += machine.Cost
+			}
 		}
 	}
 
