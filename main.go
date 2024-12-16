@@ -120,6 +120,27 @@ func setQuadrants() {
 	}
 }
 
+func hasVerticalNeighbour(robot *Robot, depth int) bool {
+	if depth == 0 {
+		return true
+	}
+	for _, robot2 := range robots {
+		if robot2.PX == robot.PX && robot2.PY == robot.PY+1 && hasVerticalNeighbour(&robot2, depth-1) {
+			return true
+		}
+	}
+	return false
+}
+
+func findCluster() bool {
+	for _, robot := range robots {
+		if hasVerticalNeighbour(&robot, 8) {
+			return true
+		}
+	}
+	return false
+}
+
 func main() {
 
 	filePath := "data"
@@ -145,11 +166,15 @@ func main() {
 	}
 
 	// printGrid()
-	for i := 0; i < 100; i++ {
+	for i := 0; true; i++ {
 		for r := range robots {
-			// fmt.Printf("Robot %d is at (%d, %d)\n", r, robots[r].PX, robots[r].PY)
 			move(&robots[r])
-			// fmt.Printf("Robot %d moved to (%d, %d)\n", r, robots[r].PX, robots[r].PY)
+		}
+
+		if findCluster() {
+			fmt.Printf("Cluster found at step %d\n", i+1)
+			printGrid()
+			return
 		}
 	}
 
@@ -168,10 +193,10 @@ func main() {
 		}
 	}
 
-	printGrid()
-	fmt.Printf("Q1: %d\n", q1.RobotCount)
-	fmt.Printf("Q2: %d\n", q2.RobotCount)
-	fmt.Printf("Q3: %d\n", q3.RobotCount)
-	fmt.Printf("Q4: %d\n", q4.RobotCount)
-	fmt.Printf("Total: %d\n", q1.RobotCount*q2.RobotCount*q3.RobotCount*q4.RobotCount)
+	// printGrid()
+	// fmt.Printf("Q1: %d\n", q1.RobotCount)
+	// fmt.Printf("Q2: %d\n", q2.RobotCount)
+	// fmt.Printf("Q3: %d\n", q3.RobotCount)
+	// fmt.Printf("Q4: %d\n", q4.RobotCount)
+	// fmt.Printf("Total: %d\n", q1.RobotCount*q2.RobotCount*q3.RobotCount*q4.RobotCount)
 }
