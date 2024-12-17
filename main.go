@@ -2,201 +2,229 @@ package main
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/Gavin152/aoc24/internal/filereader"
 )
 
-type Robot struct {
-	PX int
-	PY int
-	VX int
-	VY int
+type Position struct {
+	x, y int
 }
 
-type Quadrant struct {
-	MinX int
-	MinY int
-	MaxX int
-	MaxY int
-	RobotCount int
+func (p Position) add(other Position) Position {
+	return Position{p.x + other.x, p.y + other.y}
 }
 
-var robots = []Robot{}
-var maxX = 11
-var maxY = 7
-var q1 = Quadrant{}
-var q2 = Quadrant{}
-var q3 = Quadrant{}
-var q4 = Quadrant{}
-
-func parseLine(line string) Robot {
-	params := strings.Split(line, " ")
-	pos := strings.Split(strings.Split(params[0], "=")[1], ",")
-	vel := strings.Split(strings.Split(params[1], "=")[1], ",")
-
-	px, _ := strconv.Atoi(pos[0])
-	py, _ := strconv.Atoi(pos[1])
-	vx, _ := strconv.Atoi(vel[0])
-	vy, _ := strconv.Atoi(vel[1])
-
-	return Robot{
-		PX: px,
-		PY: py,
-		VX: vx,
-		VY: vy,
-	}
+type Warehouse struct {
+	grid     [][]rune
+	robot    Position
+	boxes    []Position
+	width    int
+	height   int
+	moves    []rune
 }
 
-func move(robot *Robot) {
-	newX := robot.PX + robot.VX
-	newY := robot.PY + robot.VY
+func parseWarehouse(input []string) (*Warehouse, error) {
+	var warehouse Warehouse
+	var mapLines []string
+	var moveStr string
+	parsingMap := true
 
-	if newX < 0 {
-		newX = maxX + newX
-	}
-	if newX >= maxX {
-		newX = newX - maxX
-	}
-	if newY < 0 {
-		newY = maxY + newY
-	}
-	if newY >= maxY {
-		newY = newY - maxY
-	}
-
-	robot.PX = newX
-	robot.PY = newY
-}
-
-func printGrid() {
-	for y := 0; y < maxY; y++ {
-		for x := 0; x < maxX; x++ {
-			found := 0
-			for _, robot := range robots {
-				if robot.PX == x && robot.PY == y {
-					found++
+	// Separate map and moves
+	for _, line := range input {
+		if len(strings.TrimSpace(line)) == 0 {
+			parsingMap = false
+			continue
+		}
+		if parsingMap {
+			if strings.Contains(line, "#") {
+				mapLines = append(mapLines, line)
+			}
+		} else {
+			// Only include actual movement characters
+			for _, ch := range line {
+				if ch == '^' || ch == 'v' || ch == '<' || ch == '>' {
+					moveStr += string(ch)
 				}
 			}
-			if found > 0 {
-				fmt.Printf("%d", found)
-			} else {
-				fmt.Printf(".")
+		}
+	}
+
+	// Parse map
+	warehouse.height = len(mapLines)
+	if warehouse.height == 0 {
+		return nil, fmt.Errorf("no map data found")
+	}
+	warehouse.width = len(mapLines[0])
+	warehouse.grid = make([][]rune, warehouse.height)
+
+	for y, line := range mapLines {
+		warehouse.grid[y] = make([]rune, warehouse.width)
+		for x, char := range line {
+			warehouse.grid[y][x] = char
+			switch char {
+			case '@':
+				warehouse.robot = Position{x, y}
+				warehouse.grid[y][x] = '.' // Replace robot with empty space in grid
+			case 'O':
+				warehouse.boxes = append(warehouse.boxes, Position{x, y})
 			}
 		}
-		fmt.Println()
 	}
+
+	// Parse moves
+	warehouse.moves = []rune(moveStr)
+
+	return &warehouse, nil
 }
 
-func setQuadrants() {
-	q1 = Quadrant{
-		MinX: 0,
-		MinY: 0,
-		MaxX: maxX / 2,
-		MaxY: maxY / 2,
-		RobotCount: 0,
+func (w *Warehouse) hasBox(pos Position) bool {
+	for _, box := range w.boxes {
+		if box == pos {
+			return true
+		}
 	}
-	q2 = Quadrant{
-		MinX: maxX / 2 + 1,
-		MinY: 0,
-		MaxX: maxX,
-		MaxY: maxY / 2,
-		RobotCount: 0,
-	}
-	q3 = Quadrant{
-		MinX: 0,
-		MinY: maxY / 2 + 1,
-		MaxX: maxX / 2,
-		MaxY: maxY,
-		RobotCount: 0,
-	}
-	q4 = Quadrant{
-		MinX: maxX / 2 + 1,
-		MinY: maxY / 2 + 1,
-		MaxX: maxX,
-		MaxY: maxY,
-		RobotCount: 0,
-	}
+	return false
 }
 
-func hasVerticalNeighbour(robot *Robot, depth int) bool {
-	if depth == 0 {
+func (w *Warehouse) moveBox(from, to Position) bool {
+	moved := true
+	if w.hasBox(to) {
+		dir := Position{to.x - from.x, to.y - from.y}
+		newPos := Position{to.x + dir.x, to.y + dir.y}
+		if w.isValidPosition(newPos) && !w.isWall(newPos) {
+			moved = w.moveBox(to, newPos)
+		}else {
+			moved = false
+		}
+	}
+	if moved && !w.isWall(to) {
+		for i, box := range w.boxes {
+			if box == from {
+				w.grid[from.y][from.x] = '.'
+				w.boxes[i] = to
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (w *Warehouse) isWall(pos Position) bool {
+
+	if w.grid[pos.y][pos.x] == '#' {
 		return true
 	}
-	for _, robot2 := range robots {
-		if robot2.PX == robot.PX && robot2.PY == robot.PY+1 && hasVerticalNeighbour(&robot2, depth-1) {
-			return true
-		}
-	}
 	return false
 }
 
-func findCluster() bool {
-	for _, robot := range robots {
-		if hasVerticalNeighbour(&robot, 8) {
-			return true
+func (w *Warehouse) isValidPosition(pos Position) bool {
+	return pos.y >= 0 && pos.y < w.height && pos.x >= 0 && pos.x < w.width
+}
+
+func (w *Warehouse) move(direction rune) bool {
+	var delta Position
+	switch direction {
+	case '^':
+		delta = Position{0, -1}
+	case 'v':
+		delta = Position{0, 1}
+	case '<':
+		delta = Position{-1, 0}
+	case '>':
+		delta = Position{1, 0}
+	default:
+		return false
+	}
+
+	newPos := w.robot.add(delta)
+	if !w.isValidPosition(newPos) || w.isWall(newPos) {
+		return false
+	}
+
+	if w.hasBox(newPos) {
+		// Try to push the box
+		newBoxPos := newPos.add(delta)
+		if !w.moveBox(newPos, newBoxPos) {
+			return false
 		}
 	}
-	return false
+
+	w.robot = newPos
+	return true
+}
+
+func (w *Warehouse) calculateGPSSum() int {
+	sum := 0
+	for _, box := range w.boxes {
+		// For each box:
+		// - Multiply its distance from top (y) by 100
+		// - Add its distance from left (x)
+		gpsCoordinate := (box.y * 100) + box.x
+		sum += gpsCoordinate
+	}
+	return sum
+}
+
+func (w *Warehouse) executeAllMoves() {
+	fmt.Printf("\nExecuting %d moves:\n", len(w.moves))
+	fmt.Printf("Move sequence: %s\n\n", string(w.moves))
+	
+	for _, move := range w.moves {
+		w.move(move)
+	}
+	
+	fmt.Printf("\nFinal GPS sum: %d\n", w.calculateGPSSum())
+}
+
+func (w *Warehouse) String() string {
+	result := make([][]rune, w.height)
+	for y := 0; y < w.height; y++ {
+		result[y] = make([]rune, w.width)
+		copy(result[y], w.grid[y])
+	}
+
+	// Place boxes
+	for _, box := range w.boxes {
+		result[box.y][box.x] = 'O'
+	}
+
+	// Place robot
+	result[w.robot.y][w.robot.x] = '@'
+
+	var sb strings.Builder
+	for _, row := range result {
+		sb.WriteString(string(row))
+		sb.WriteRune('\n')
+	}
+	return sb.String()
 }
 
 func main() {
-
 	filePath := "data"
 	// filePath := "example"
 
-	if filePath == "example" {
-		maxX = 11
-		maxY = 7
-	} else {
-		maxX = 101
-		maxY = 103
-	}
-
-	setQuadrants()
-
+	var lines []string
 	err := filereader.ReadFileLineByLine(filePath, func(line string) error {
-		robot := parseLine(line)
-		robots = append(robots, robot)
+		lines = append(lines, line)
 		return nil
 	})
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("Error reading file: %v\n", err)
+		return
 	}
 
-	// printGrid()
-	for i := 0; true; i++ {
-		for r := range robots {
-			move(&robots[r])
-		}
-
-		if findCluster() {
-			fmt.Printf("Cluster found at step %d\n", i+1)
-			printGrid()
-			return
-		}
+	warehouse, err := parseWarehouse(lines)
+	if err != nil {
+		fmt.Printf("Error parsing warehouse: %v\n", err)
+		return
 	}
 
-	for _, robot := range robots {
-		if robot.PX >= q1.MinX && robot.PX < q1.MaxX && robot.PY >= q1.MinY && robot.PY < q1.MaxY {
-			q1.RobotCount++
-		}
-		if robot.PX >= q2.MinX && robot.PX < q2.MaxX && robot.PY >= q2.MinY && robot.PY < q2.MaxY {
-			q2.RobotCount++
-		}
-		if robot.PX >= q3.MinX && robot.PX < q3.MaxX && robot.PY >= q3.MinY && robot.PY < q3.MaxY {
-			q3.RobotCount++
-		}
-		if robot.PX >= q4.MinX && robot.PX < q4.MaxX && robot.PY >= q4.MinY && robot.PY < q4.MaxY {
-			q4.RobotCount++
-		}
-	}
+	fmt.Println("Initial state:")
+	fmt.Print(warehouse)
 
-	// printGrid()
-	// fmt.Printf("Q1: %d\n", q1.RobotCount)
-	// fmt.Printf("Q2: %d\n", q2.RobotCount)
-	// fmt.Printf("Q3: %d\n", q3.RobotCount)
-	// fmt.Printf("Q4: %d\n", q4.RobotCount)
-	// fmt.Printf("Total: %d\n", q1.RobotCount*q2.RobotCount*q3.RobotCount*q4.RobotCount)
+	warehouse.executeAllMoves()
+
+	fmt.Println("\nFinal state:")
+	fmt.Print(warehouse)
 }
