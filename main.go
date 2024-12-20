@@ -1,238 +1,118 @@
 package main
 
 import (
-	"container/heap"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/Gavin152/aoc24/internal/filereader"
 )
 
-type Position struct {
-	x, y int
-}
+var regA, regB, regC int
+var program []int
+var output []int
 
-type State struct {
-	pos      Position
-	dir      rune
-	score    int
-	priority int
-	path     []Position
-}
+func parse(lines []string) error {
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
 
-// Priority queue implementation
-type PriorityQueue []*State
-
-func (pq PriorityQueue) Len() int { return len(pq) }
-
-func (pq PriorityQueue) Less(i, j int) bool {
-	return pq[i].priority < pq[j].priority
-}
-
-func (pq PriorityQueue) Swap(i, j int) {
-	pq[i], pq[j] = pq[j], pq[i]
-}
-
-func (pq *PriorityQueue) Push(x interface{}) {
-	item := x.(*State)
-	*pq = append(*pq, item)
-}
-
-func (pq *PriorityQueue) Pop() interface{} {
-	old := *pq
-	n := len(old)
-	item := old[n-1]
-	*pq = old[0 : n-1]
-	return item
-}
-
-var (
-	grid  [][]rune
-	start Position
-	end   Position
-)
-
-const (
-	North = 'N'
-	South = 'S'
-	East  = 'E'
-	West  = 'W'
-)
-
-// Returns the new position after moving one step in the given direction
-func move(pos Position, dir rune) Position {
-	switch dir {
-	case North:
-		return Position{pos.x, pos.y - 1}
-	case South:
-		return Position{pos.x, pos.y + 1}
-	case East:
-		return Position{pos.x + 1, pos.y}
-	case West:
-		return Position{pos.x - 1, pos.y}
-	}
-	return pos
-}
-
-// Returns the directions to try (left turn and right turn from current direction)
-func getTurnDirections(dir rune) []rune {
-	switch dir {
-	case North:
-		return []rune{West, East}
-	case South:
-		return []rune{East, West}
-	case East:
-		return []rune{North, South}
-	case West:
-		return []rune{South, North}
+		if strings.HasPrefix(line, "Register A:") {
+			val, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, "Register A:")))
+			if err != nil {
+				return fmt.Errorf("failed to parse Register A: %v", err)
+			}
+			regA = val
+		} else if strings.HasPrefix(line, "Register B:") {
+			val, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, "Register B:")))
+			if err != nil {
+				return fmt.Errorf("failed to parse Register B: %v", err)
+			}
+			regB = val
+		} else if strings.HasPrefix(line, "Register C:") {
+			val, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, "Register C:")))
+			if err != nil {
+				return fmt.Errorf("failed to parse Register C: %v", err)
+			}
+			regC = val
+		} else if strings.HasPrefix(line, "Program:") {
+			program = []int{} // Reset program
+			numStr := strings.TrimSpace(strings.TrimPrefix(line, "Program:"))
+			nums := strings.Split(numStr, ",")
+			for _, num := range nums {
+				val, err := strconv.Atoi(strings.TrimSpace(num))
+				if err != nil {
+					return fmt.Errorf("failed to parse program number: %v", err)
+				}
+				program = append(program, val)
+			}
+		}
 	}
 	return nil
 }
 
-func parseLabyrinth(lines []string) {
-	grid = make([][]rune, len(lines))
-	for y, line := range lines {
-		grid[y] = []rune(line)
-		for x, ch := range grid[y] {
-			switch ch {
-			case 'S':
-				start = Position{x, y}
-			case 'E':
-				end = Position{x, y}
+// resolveOperand returns the actual value of an operand based on whether it's a literal or combo operand
+func resolveOperand(operand int, isCombo bool) int {
+	if !isCombo {
+		return operand
+	}
+	switch operand {
+	case 0, 1, 2, 3:
+		return operand
+	case 4:
+		return regA
+	case 5:
+		return regB
+	case 6:
+		return regC
+	default: // case 7 is reserved
+		return 0
+	}
+}
+
+func run() {
+	for i := 0; i < len(program); i += 2 {
+		opcode := program[i]
+		rawOperand := program[i+1]
+
+		// determine if operand is combo based on instruction
+		isCombo := opcode == 0 || opcode == 2 || opcode == 5 || opcode == 6 || opcode == 7
+		operand := resolveOperand(rawOperand, isCombo)
+
+		switch opcode {
+		case 0: // adv - divide A by 2^operand, store in A
+			divisor := 1 << operand
+			regA = regA / divisor
+
+		case 1: // bxl - XOR B with literal operand
+			regB = regB ^ operand
+
+		case 2: // bst - store operand mod 8 in B
+			regB = operand % 8
+
+		case 3: // jnz - jump if A is not zero
+			if regA != 0 {
+				i = operand - 2 // -2 because the loop will add 2
+				continue
 			}
+
+		case 4: // bxc - XOR B with C (ignores operand)
+			regB = regB ^ regC
+
+		case 5: // out - output operand mod 8
+			output = append(output, operand%8)
+
+		case 6: // bdv - divide A by 2^operand, store in B
+			divisor := 1 << operand
+			regB = regA / divisor
+
+		case 7: // cdv - divide A by 2^operand, store in C
+			divisor := 1 << operand
+			regC = regA / divisor
 		}
 	}
-}
-
-func printLabyrinth(grid [][]rune) {
-	for y := range grid {
-		fmt.Println(string(grid[y]))
-	}
-}
-
-func isValid(pos Position) bool {
-	return pos.x >= 0 && pos.y >= 0 && pos.x < len(grid[0]) && pos.y < len(grid) && grid[pos.y][pos.x] != '#'
-}
-
-func printPath(path []Position) {
-	// Create a copy of the grid
-	display := make([][]rune, len(grid))
-	for i := range grid {
-		display[i] = make([]rune, len(grid[i]))
-		copy(display[i], grid[i])
-	}
-
-	// Mark the path with 'O'
-	for _, pos := range path {
-		display[pos.y][pos.x] = 'O'
-	}
-	// Always mark start and end with S and E
-	display[start.y][start.x] = 'S'
-	display[end.y][end.x] = 'E'
-
-	for _, row := range display {
-		fmt.Println(string(row))
-	}
-}
-
-// Count unique positions across all paths
-func countUniqueLocations(paths [][]Position) int {
-	unique := make(map[Position]bool)
-	
-	// Explicitly add start and end positions
-	unique[start] = true
-	unique[end] = true
-	
-	// Add all positions from all paths
-	for _, path := range paths {
-		for _, pos := range path {
-			unique[pos] = true
-		}
-	}
-	return len(unique)
-}
-
-func findPaths() (int, [][]Position) {
-	type visitKey struct {
-		pos Position
-		dir rune
-	}
-	visited := make(map[visitKey]int)
-	shortestPaths := make([][]Position, 0)
-	bestScore := -1
-
-	pq := make(PriorityQueue, 0)
-	heap.Init(&pq)
-	
-	// Include start position in initial path
-	initialPath := []Position{start}
-	
-	heap.Push(&pq, &State{
-		pos:      start,
-		dir:      East,
-		score:    0,
-		priority: 0,
-		path:     initialPath,
-	})
-
-	for pq.Len() > 0 {
-		current := heap.Pop(&pq).(*State)
-		key := visitKey{current.pos, current.dir}
-
-		// If we've seen this state before with a better score, skip it
-		if bestScore, exists := visited[key]; exists && bestScore < current.score {
-			continue
-		}
-		visited[key] = current.score
-
-		// If we reached the end
-		if current.pos == end {
-			if bestScore == -1 || current.score < bestScore {
-				// Found a better path
-				// Include end position in path
-				finalPath := append(current.path, end)
-				bestScore = current.score
-				shortestPaths = [][]Position{finalPath}
-			} else if current.score == bestScore {
-				// Found another path of same length
-				finalPath := append(current.path, end)
-				shortestPaths = append(shortestPaths, finalPath)
-			}
-			continue
-		}
-
-		// Try moving forward
-		nextPos := move(current.pos, current.dir)
-		if isValid(nextPos) {
-			newPath := make([]Position, len(current.path))
-			copy(newPath, current.path)
-			heap.Push(&pq, &State{
-				pos:      nextPos,
-				dir:      current.dir,
-				score:    current.score + 1,
-				priority: current.score + 1,
-				path:     append(newPath, nextPos),
-			})
-		}
-
-		// Try turning and moving
-		for _, newDir := range getTurnDirections(current.dir) {
-			nextPos := move(current.pos, newDir)
-			if isValid(nextPos) {
-				newScore := current.score + 1000 + 1
-				newPath := make([]Position, len(current.path))
-				copy(newPath, current.path)
-				heap.Push(&pq, &State{
-					pos:      nextPos,
-					dir:      newDir,
-					score:    newScore,
-					priority: newScore,
-					path:     append(newPath, nextPos),
-				})
-			}
-		}
-	}
-
-	return bestScore, shortestPaths
 }
 
 func main() {
@@ -249,23 +129,18 @@ func main() {
 		return
 	}
 
-	parseLabyrinth(lines)
-	fmt.Printf("Start position: x=%d, y=%d\n", start.x, start.y)
-	fmt.Printf("End position: x=%d, y=%d\n", end.x, end.y)
-	fmt.Println("Labyrinth:")
-	printLabyrinth(grid)
+	if err := parse(lines); err != nil {
+		fmt.Printf("Error parsing input: %v\n", err)
+		return
+	}
 
-	if bestScore, paths := findPaths(); bestScore != -1 {
-		fmt.Printf("\nBest score: %d\n", bestScore)
-		fmt.Printf("Number of paths with best score: %d\n", len(paths))
-		fmt.Printf("Number of unique locations visited: %d\n", countUniqueLocations(paths))
-		// fmt.Println("\nAll shortest paths:")
-		// for i, path := range paths {
-		// 	fmt.Printf("\nPath %d:\n", i+1)
-		// 	printPath(path)
-		// 	fmt.Println()
-		// }
-	} else {
-		fmt.Println("\nNo path found!")
+	run()
+
+	fmt.Printf("Register A: %d\n", regA)
+	fmt.Printf("Register B: %d\n", regB)
+	fmt.Printf("Register C: %d\n", regC)
+	fmt.Printf("Program: %v\n", program)
+	if len(output) > 0 {
+		fmt.Printf("Output: %v\n", strings.Join(strings.Fields(fmt.Sprint(output)), ","))
 	}
 }
