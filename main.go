@@ -154,16 +154,6 @@ func main() {
 	}
 	fillMemSpace(lines, 0, start)
 
-	lastPos := 0
-	for i := start; i < len(lines); i++ {
-		fillMemSpace(lines, i, i+1)
-		dist := findShortestPath()
-		if dist == -1 {
-			lastPos = i
-			break
-		}
-	}
-
-	fmt.Printf("Shortest Path of %d would be blocked at %v\n", lastPos, lines[lastPos])
 	printGrid()
+	fmt.Printf("Shortest Path is %d steps long\n", findShortestPath())
 }
