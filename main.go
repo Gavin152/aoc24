@@ -8,116 +8,140 @@ import (
 	"github.com/Gavin152/aoc24/internal/filereader"
 )
 
-var regA, regB, regC int
-var program []int
-var output []int
+var memSpace [][]rune
 
-func parse(lines []string) error {
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
+func initGrid(size int) {
+	grid := make([][]rune, size)
+	for i := range grid {
+		grid[i] = make([]rune, size)
+		for j := range grid[i] {
+			grid[i][j] = '.'
+		}
+	}
+	memSpace = grid
+}
+
+func fillMemSpace(bytes []string, start int, end int) []int {
+	if start >= len(bytes) {
+		return []int{-1, -1}
+	}
+	if end > len(bytes) {
+		end = len(bytes)
+	}
+	for i := start; i < end; i++ {
+		split := strings.Split(bytes[i], ",")
+		x, _ := strconv.Atoi(split[0])
+		y, _ := strconv.Atoi(split[1])
+		if memSpace[x][y] == 'O' {
+			return []int{x, y}
+		}
+		memSpace[x][y] = '#'
+	}
+	return []int{-1, -1}
+}
+
+type Point struct {
+	x, y int
+}
+
+func (p Point) isValid(size int) bool {
+	return p.x >= 0 && p.x < size && p.y >= 0 && p.y < size
+}
+
+func printGrid() {
+	for i := range memSpace {
+		for j := range memSpace[i] {
+			fmt.Print(string(memSpace[j][i]))
+		}
+		fmt.Println()
+	}
+	fmt.Println()
+}
+
+func findShortestPath() int {
+	size := len(memSpace)
+	if size == 0 {
+		return -1 // Invalid grid
+	}
+
+	dist := make([][]int, size)
+	visited := make([][]bool, size)
+	
+	// Initialize matrices
+	for i := range dist {
+		dist[i] = make([]int, size)
+		visited[i] = make([]bool, size)
+		for j := range dist[i] {
+			dist[i][j] = int(^uint(0) >> 1) // Max int
+		}
+	}
+
+	type queueItem struct {
+		p    Point
+		dist int
+	}
+	pq := []queueItem{{Point{0, 0}, 0}}
+	dist[0][0] = 0
+
+	moves := [][2]int{{0, 1}, {1, 0}, {0, -1}, {-1, 0}}
+
+	for len(pq) > 0 {
+		current := pq[0]
+		pq = pq[1:]
+
+		if !current.p.isValid(size) || visited[current.p.x][current.p.y] {
 			continue
 		}
 
-		if strings.HasPrefix(line, "Register A:") {
-			val, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, "Register A:")))
-			if err != nil {
-				return fmt.Errorf("failed to parse Register A: %v", err)
-			}
-			regA = val
-		} else if strings.HasPrefix(line, "Register B:") {
-			val, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, "Register B:")))
-			if err != nil {
-				return fmt.Errorf("failed to parse Register B: %v", err)
-			}
-			regB = val
-		} else if strings.HasPrefix(line, "Register C:") {
-			val, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, "Register C:")))
-			if err != nil {
-				return fmt.Errorf("failed to parse Register C: %v", err)
-			}
-			regC = val
-		} else if strings.HasPrefix(line, "Program:") {
-			program = []int{} // Reset program
-			numStr := strings.TrimSpace(strings.TrimPrefix(line, "Program:"))
-			nums := strings.Split(numStr, ",")
-			for _, num := range nums {
-				val, err := strconv.Atoi(strings.TrimSpace(num))
-				if err != nil {
-					return fmt.Errorf("failed to parse program number: %v", err)
-				}
-				program = append(program, val)
-			}
+		visited[current.p.x][current.p.y] = true
+
+		if current.p.x == size-1 && current.p.y == size-1 {
+			return current.dist
 		}
-	}
-	return nil
-}
 
-// resolveOperand returns the actual value of an operand based on whether it's a literal or combo operand
-func resolveOperand(operand int, isCombo bool) int {
-	if !isCombo {
-		return operand
-	}
-	switch operand {
-	case 0, 1, 2, 3:
-		return operand
-	case 4:
-		return regA
-	case 5:
-		return regB
-	case 6:
-		return regC
-	default: // case 7 is reserved
-		return 0
-	}
-}
+		for _, move := range moves {
+			newX, newY := current.p.x+move[0], current.p.y+move[1]
+			next := Point{newX, newY}
 
-func run() {
-	for i := 0; i < len(program); i += 2 {
-		opcode := program[i]
-		rawOperand := program[i+1]
-
-		// determine if operand is combo based on instruction
-		isCombo := opcode == 0 || opcode == 2 || opcode == 5 || opcode == 6 || opcode == 7
-		operand := resolveOperand(rawOperand, isCombo)
-
-		switch opcode {
-		case 0: // adv - divide A by 2^operand, store in A
-			divisor := 1 << operand
-			regA = regA / divisor
-
-		case 1: // bxl - XOR B with literal operand
-			regB = regB ^ operand
-
-		case 2: // bst - store operand mod 8 in B
-			regB = operand % 8
-
-		case 3: // jnz - jump if A is not zero
-			if regA != 0 {
-				i = operand - 2 // -2 because the loop will add 2
+			if !next.isValid(size) || visited[newX][newY] || memSpace[newX][newY] == '#' {
 				continue
 			}
 
-		case 4: // bxc - XOR B with C (ignores operand)
-			regB = regB ^ regC
+			newDist := current.dist + 1
+			if newDist < dist[newX][newY] {
+				dist[newX][newY] = newDist
 
-		case 5: // out - output operand mod 8
-			output = append(output, operand%8)
-
-		case 6: // bdv - divide A by 2^operand, store in B
-			divisor := 1 << operand
-			regB = regA / divisor
-
-		case 7: // cdv - divide A by 2^operand, store in C
-			divisor := 1 << operand
-			regC = regA / divisor
+				inserted := false
+				for i, p := range pq {
+					if newDist < p.dist {
+						pq = append(pq[:i], append([]queueItem{{next, newDist}}, pq[i:]...)...)
+						inserted = true
+						break
+					}
+				}
+				if !inserted {
+					pq = append(pq, queueItem{next, newDist})
+				}
+			}
 		}
 	}
+
+	return -1
 }
 
 func main() {
 	// filePath := "example"
 	filePath := "data"
+
+	start := 0
+
+	if filePath == "example" {
+		initGrid(7)
+		start = 12
+	} else {
+		initGrid(71)
+		start = 1024
+	}
 
 	var lines []string
 	err := filereader.ReadFileLineByLine(filePath, func(line string) error {
@@ -128,19 +152,18 @@ func main() {
 		fmt.Printf("Error reading file: %v\n", err)
 		return
 	}
+	fillMemSpace(lines, 0, start)
 
-	if err := parse(lines); err != nil {
-		fmt.Printf("Error parsing input: %v\n", err)
-		return
+	lastPos := 0
+	for i := start; i < len(lines); i++ {
+		fillMemSpace(lines, i, i+1)
+		dist := findShortestPath()
+		if dist == -1 {
+			lastPos = i
+			break
+		}
 	}
 
-	run()
-
-	fmt.Printf("Register A: %d\n", regA)
-	fmt.Printf("Register B: %d\n", regB)
-	fmt.Printf("Register C: %d\n", regC)
-	fmt.Printf("Program: %v\n", program)
-	if len(output) > 0 {
-		fmt.Printf("Output: %v\n", strings.Join(strings.Fields(fmt.Sprint(output)), ","))
-	}
+	fmt.Printf("Shortest Path of %d would be blocked at %v\n", lastPos, lines[lastPos])
+	printGrid()
 }
