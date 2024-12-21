@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/list"
 	"fmt"
 	"strconv"
 	"strings"
@@ -72,6 +73,10 @@ func resolveOperand(operand int, isCombo bool) int {
 	}
 }
 
+// func printRegs() {
+// 	fmt.Printf("A: %d, B: %d, C: %d\n", regA, regB, regC)
+// }
+
 func run() {
 	for i := 0; i < len(program); i += 2 {
 		opcode := program[i]
@@ -115,8 +120,54 @@ func run() {
 	}
 }
 
+func matchesProgram(output []int, expected []int) bool {
+	if len(output) != len(expected) {
+		return false
+	}
+	for i := range output {
+		if output[i] != expected[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func solve() bool {
+	type QueueItem struct {
+		a uint64
+		n int
+	}
+
+	queue := list.New()
+	queue.PushBack(QueueItem{a: 0, n: 1})
+
+	for queue.Len() > 0 {
+		item := queue.Remove(queue.Front()).(QueueItem)
+		a, n := item.a, item.n
+
+		if n > len(program) { // Base case
+			return true
+		}
+
+		for i := uint64(0); i < 8; i++ {
+			regA := (a << 3) | i
+			run()
+			fmt.Printf("Running: %d, %d\n", regA, n)
+			fmt.Printf("Queued: %d, %d\n", regA, n)
+			target := program[len(program)-n:]
+			fmt.Printf("Target: %v\n", strings.Join(strings.Fields(fmt.Sprint(target)), ","))
+
+			// Save correct partial solutions
+			if matchesProgram(output, target) {
+				queue.PushBack(QueueItem{a: regA, n: n + 1})
+			}
+		}
+	}
+
+	return false
+}
+
 func main() {
-	// filePath := "example"
 	filePath := "data"
 
 	var lines []string
@@ -134,13 +185,18 @@ func main() {
 		return
 	}
 
-	run()
+	// Try the value
+	if solve() {
+		fmt.Println("Current value of A produces matching output!")
+	} else {
+		fmt.Println("Current value of A does not produce matching output.")
+	}
 
 	fmt.Printf("Register A: %d\n", regA)
 	fmt.Printf("Register B: %d\n", regB)
 	fmt.Printf("Register C: %d\n", regC)
 	fmt.Printf("Program: %v\n", program)
 	if len(output) > 0 {
-		fmt.Printf("Output: %v\n", strings.Join(strings.Fields(fmt.Sprint(output)), ","))
+		fmt.Printf("Output:  %v\n", strings.Join(strings.Fields(fmt.Sprint(output)), ","))
 	}
 }
