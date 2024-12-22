@@ -2,146 +2,70 @@ package main
 
 import (
 	"fmt"
-	"strconv"
+	"slices"
 	"strings"
 
 	"github.com/Gavin152/aoc24/internal/filereader"
 )
 
-var memSpace [][]rune
+var towels = []string{}
+var patterns = []string{}
 
-func initGrid(size int) {
-	grid := make([][]rune, size)
-	for i := range grid {
-		grid[i] = make([]rune, size)
-		for j := range grid[i] {
-			grid[i][j] = '.'
-		}
-	}
-	memSpace = grid
-}
-
-func fillMemSpace(bytes []string, start int, end int) []int {
-	if start >= len(bytes) {
-		return []int{-1, -1}
-	}
-	if end > len(bytes) {
-		end = len(bytes)
-	}
-	for i := start; i < end; i++ {
-		split := strings.Split(bytes[i], ",")
-		x, _ := strconv.Atoi(split[0])
-		y, _ := strconv.Atoi(split[1])
-		if memSpace[x][y] == 'O' {
-			return []int{x, y}
-		}
-		memSpace[x][y] = '#'
-	}
-	return []int{-1, -1}
-}
-
-type Point struct {
-	x, y int
-}
-
-func (p Point) isValid(size int) bool {
-	return p.x >= 0 && p.x < size && p.y >= 0 && p.y < size
-}
-
-func printGrid() {
-	for i := range memSpace {
-		for j := range memSpace[i] {
-			fmt.Print(string(memSpace[j][i]))
-		}
-		fmt.Println()
-	}
-	fmt.Println()
-}
-
-func findShortestPath() int {
-	size := len(memSpace)
-	if size == 0 {
-		return -1 // Invalid grid
-	}
-
-	dist := make([][]int, size)
-	visited := make([][]bool, size)
-	
-	// Initialize matrices
-	for i := range dist {
-		dist[i] = make([]int, size)
-		visited[i] = make([]bool, size)
-		for j := range dist[i] {
-			dist[i][j] = int(^uint(0) >> 1) // Max int
-		}
-	}
-
-	type queueItem struct {
-		p    Point
-		dist int
-	}
-	pq := []queueItem{{Point{0, 0}, 0}}
-	dist[0][0] = 0
-
-	moves := [][2]int{{0, 1}, {1, 0}, {0, -1}, {-1, 0}}
-
-	for len(pq) > 0 {
-		current := pq[0]
-		pq = pq[1:]
-
-		if !current.p.isValid(size) || visited[current.p.x][current.p.y] {
+func parseInput(lines []string) {
+	part2 := false
+	for _, line := range lines {
+		if line == "" {
+			part2 = true
 			continue
 		}
-
-		visited[current.p.x][current.p.y] = true
-
-		if current.p.x == size-1 && current.p.y == size-1 {
-			return current.dist
-		}
-
-		for _, move := range moves {
-			newX, newY := current.p.x+move[0], current.p.y+move[1]
-			next := Point{newX, newY}
-
-			if !next.isValid(size) || visited[newX][newY] || memSpace[newX][newY] == '#' {
-				continue
-			}
-
-			newDist := current.dist + 1
-			if newDist < dist[newX][newY] {
-				dist[newX][newY] = newDist
-
-				inserted := false
-				for i, p := range pq {
-					if newDist < p.dist {
-						pq = append(pq[:i], append([]queueItem{{next, newDist}}, pq[i:]...)...)
-						inserted = true
-						break
-					}
-				}
-				if !inserted {
-					pq = append(pq, queueItem{next, newDist})
-				}
+		if part2 {
+			patterns = append(patterns, line)
+		} else {
+			split := strings.Split(line, ", ")
+			for _, towel := range split {
+				towels = append(towels, strings.TrimSpace(towel))
 			}
 		}
 	}
+}
 
-	return -1
+func checkpattern(pattern string) bool {
+	isMatch := false
+	if len(pattern) == 0 {
+		return true
+	}
+	for _, towel := range towels {
+		if isMatch {
+			break
+		}
+		// fmt.Printf("Checking if pattern %s starts with %s\n", pattern, towel)
+		if strings.HasPrefix(pattern, towel) {
+			newPat := strings.TrimPrefix(pattern, towel)
+			isMatch = checkpattern(newPat)
+		} else {
+			continue
+		}
+	}
+	return isMatch
+}
+
+func checkpatterns() int {
+	count := 0
+	for _, pattern := range patterns {
+		// fmt.Printf("Inspecting pattern %s\n", pattern)
+		if checkpattern(pattern) {
+			// fmt.Printf("Matching pattern found!\n\n")
+			count++
+		} else {
+			// fmt.Printf("No matcches found for %s\n\n", pattern)
+		}
+	}
+	return count
 }
 
 func main() {
 	// filePath := "example"
 	filePath := "data"
-
-	start := 0
-
-	if filePath == "example" {
-		initGrid(7)
-		start = 12
-	} else {
-		initGrid(71)
-		start = 1024
-	}
 
 	var lines []string
 	err := filereader.ReadFileLineByLine(filePath, func(line string) error {
@@ -152,8 +76,17 @@ func main() {
 		fmt.Printf("Error reading file: %v\n", err)
 		return
 	}
-	fillMemSpace(lines, 0, start)
 
-	printGrid()
-	fmt.Printf("Shortest Path is %d steps long\n", findShortestPath())
+	parseInput(lines)
+	slices.SortFunc(towels, func(a, b string) int {
+		// Compare lengths in reverse order for descending sort
+		return len(b) - len(a)
+	})
+
+	// fmt.Printf("Towles: %v\n", towels)
+	// fmt.Printf("Patterns: %v\n", patterns)
+
+	count := checkpatterns()
+
+	fmt.Printf("%d matching patterns found", count)
 }
