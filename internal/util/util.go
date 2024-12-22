@@ -42,7 +42,7 @@ func ParseGridToInt (grid [][]rune) ([][]int, error) {
 func PrintGrid [T any](grid [][]T) {
 	for i, col := range grid {
 		for j := range col {
-			fmt.Printf("%v", grid[j][i])
+			fmt.Printf("%c", grid[j][i])
 		}
 		fmt.Printf("\n")
 	}
