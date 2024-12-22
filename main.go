@@ -29,36 +29,37 @@ func parseInput(lines []string) {
 	}
 }
 
-func checkpattern(pattern string) bool {
-	isMatch := false
-	if len(pattern) == 0 {
-		return true
+func checkpattern(pattern string, cache map[string]int) int {
+
+	val, ok := cache[pattern]
+	if ok {
+		return val
+	}
+	matches := 0
+	if pattern == ""{
+		// fmt.Println("Pattern matched")
+		return 1
 	}
 	for _, towel := range towels {
-		if isMatch {
-			break
-		}
-		// fmt.Printf("Checking if pattern %s starts with %s\n", pattern, towel)
-		if strings.HasPrefix(pattern, towel) {
-			newPat := strings.TrimPrefix(pattern, towel)
-			isMatch = checkpattern(newPat)
-		} else {
-			continue
+		if towel == pattern {
+			matches++
+		} else if strings.HasPrefix(pattern, towel) {
+			matches += checkpattern(pattern[len(towel):], cache)
 		}
 	}
-	return isMatch
+	cache[pattern] = matches
+	return matches
 }
 
 func checkpatterns() int {
+	cache := map[string]int{}
 	count := 0
 	for _, pattern := range patterns {
-		// fmt.Printf("Inspecting pattern %s\n", pattern)
-		if checkpattern(pattern) {
-			// fmt.Printf("Matching pattern found!\n\n")
-			count++
-		} else {
-			// fmt.Printf("No matcches found for %s\n\n", pattern)
-		}
+		fmt.Printf("Checking pattern %s\n", pattern)
+		patternMatches := checkpattern(pattern, cache)
+		fmt.Printf("Pattern %s can be matched %d different ways\n", pattern, patternMatches)
+		fmt.Println("================")
+		count += patternMatches
 	}
 	return count
 }
