@@ -2,33 +2,29 @@ package main
 
 import (
 	"fmt"
-	"slices"
+	_ "slices"
 
 	"github.com/Gavin152/aoc24/internal/filereader"
 	"github.com/Gavin152/aoc24/internal/util"
 )
 
+type Position struct {
+	X int
+	Y int
+}
+
 type Cheat struct {
-	Start []int
-	End   []int
+	Start Position
+	End   Position
+	Path  [][]int
 }
 
 func isInBounds(row, col int, grid [][]rune) bool {
 	return row >= 0 && row < len(grid) && col >= 0 && col < len(grid[0])
 }
 
-func cheatedAtPosition(row, col int, cheats *[]Cheat) bool {
-	for _, cheat := range *cheats {
-		if cheat.Start[0] == row && cheat.Start[1] == col {
-			return true
-		}
-	}
-	return false
-}
-
-func getPath(grid [][]rune, withCheat bool, cheats *[]Cheat) [][]int {
+func getPath(grid [][]rune) ([][]int, []int) {
 	path := [][]int{}
-	cheated := false
 
 	// Find starting point 'S'
 	var start []int
@@ -44,7 +40,7 @@ func getPath(grid [][]rune, withCheat bool, cheats *[]Cheat) [][]int {
 		}
 	}
 	if start == nil {
-		return path
+		return path, start
 	}
 
 	// Add starting point
@@ -61,30 +57,6 @@ func getPath(grid [][]rune, withCheat bool, cheats *[]Cheat) [][]int {
 		for _, dir := range dirs {
 			newRow, newCol := row+dir[0], col+dir[1]
 
-			if withCheat && !cheated && !cheatedAtPosition(newRow, newCol, cheats) {
-				// check we're not going out of bounds
-				if !isInBounds(newRow, newCol, grid) {
-					continue
-				}
-
-				cStartX := newRow
-				cStartY := newCol
-				cEndX := newRow + dir[0]
-				cEndY := newCol + dir[1]
-
-				if grid[cStartX][cStartY] == '#' &&
-					isInBounds(cEndX, cEndY, grid) &&
-					grid[cEndX][cEndY] == '.' {
-					*cheats = append(*cheats, Cheat{Start: []int{cStartX, cStartY}, End: []int{cEndX, cEndY}})
-					newRow = cEndX
-					newCol = cEndY
-					cheated = true
-					path = append(path, []int{cStartX, cStartY})
-					path = append(path, []int{cEndX, cEndY})
-					continue
-				}
-			}
-
 			// Check bounds
 			if !isInBounds(newRow, newCol, grid) {
 				continue
@@ -93,7 +65,7 @@ func getPath(grid [][]rune, withCheat bool, cheats *[]Cheat) [][]int {
 			// Check if we found the end
 			if grid[newRow][newCol] == 'E' {
 				path = append(path, []int{newRow, newCol})
-				return path
+				return path, start
 			}
 
 			// Check if it's a path tile we haven't visited yet
@@ -122,12 +94,80 @@ func getPath(grid [][]rune, withCheat bool, cheats *[]Cheat) [][]int {
 		}
 	}
 
-	return path
+	return path, start
+}
+
+func cheat(grid [][]rune, path [][]int) []Cheat {
+	cheats := []Cheat{}
+	for _, pos := range path {
+		cheat, ok := cheatAtPosition(grid, path, Position{X: pos[0], Y: pos[1]})
+		if ok {
+			cheats = append(cheats, cheat...)
+		}
+		// if i == 17 {
+		// 	util.PrintGridWithPath(grid, cheat[0].Path)
+		// }
+	}
+	return cheats
+}
+
+func cheatAtPosition(grid [][]rune, path [][]int, position Position) ([]Cheat, bool) {
+	dirs := [][]int{{-1, 0}, {0, 1}, {1, 0}, {0, -1}}
+	cheats := []Cheat{}
+
+	// Find position index in the original path
+	posIdx := -1
+	for i, p := range path {
+		if p[0] == position.X && p[1] == position.Y {
+			posIdx = i
+			break
+		}
+	}
+	if posIdx == -1 {
+		return nil, false
+	}
+
+	for _, dir := range dirs {
+		cStart := Position{X: position.X + dir[0], Y: position.Y + dir[1]}
+		cEnd := Position{X: cStart.X + dir[0], Y: cStart.Y + dir[1]}
+
+		// Find the end position in the original path
+		cEndIdx := -1
+		for i, p := range path {
+			if p[0] == cEnd.X && p[1] == cEnd.Y {
+				cEndIdx = i
+				break
+			}
+		}
+
+		if grid[cStart.X][cStart.Y] == '#' &&
+			isInBounds(cEnd.X, cEnd.Y, grid) &&
+			(grid[cEnd.X][cEnd.Y] == '.' || grid[cEnd.X][cEnd.Y] == 'E') &&
+			cEndIdx > posIdx {
+			
+			// Create new path slices to avoid modifying the original
+			path1 := make([][]int, posIdx+1)
+			copy(path1, path[:posIdx+1])
+			
+			path2 := make([][]int, len(path)-cEndIdx)
+			copy(path2, path[cEndIdx:])
+
+			// Create the cheated path
+			cPath := make([][]int, 0, len(path1)+1+len(path2))
+			cPath = append(cPath, path1...)
+			cPath = append(cPath, []int{cStart.X, cStart.Y})
+			cPath = append(cPath, path2...)
+
+			cheats = append(cheats, Cheat{Start: cStart, End: cEnd, Path: cPath})
+		}
+	}
+
+	return cheats, len(cheats) > 0
 }
 
 func main() {
-	filePath := "example"
-	// filePath := "data"
+	// filePath := "example"
+	filePath := "data"
 
 	var lines []string
 	err := filereader.ReadFileLineByLine(filePath, func(line string) error {
@@ -142,33 +182,37 @@ func main() {
 	grid := util.SliceToGrid(lines)
 	util.PrintGrid(grid)
 
-	path := getPath(grid, false, nil)
-	fmt.Printf("Path: %v\n", path)
+	path, start := getPath(grid)
+	// fmt.Printf("Path: %v\n", path)
 	fmt.Printf("Path length: %v\n", len(path))
+	// util.PrintGridWithPath(grid, path)
 
 	cheats := []Cheat{}
-	cheatedPaths := [][][]int{}
-	for range path {
-		cp := getPath(grid, true, &cheats)
-		cheatedPaths = append(cheatedPaths, cp)
-		// fmt.Printf("Found a cheated path of length %v at position %v\n", len(cp), p)
+
+	c1, c1Found := cheatAtPosition(grid, path, Position{X: start[0], Y: start[1]})
+	if c1Found {
+		fmt.Println("Found cheat at start")
+		cheats = append(cheats, c1...)
 	}
 
-	// fmt.Printf("Number of cheated paths: %v\n", len(cheatedPaths))
-
-	slices.SortFunc(cheatedPaths, func(a, b [][]int) int {
-		return len(a) - len(b)
-	})
-
-	for idx := 0; idx < 20; idx++ {
-		// fmt.Printf("Cheat %d: %v\n", idx, cheats[idx])
-		// fmt.Printf("Cheat %d path: %v\n", idx, cheatedPaths[idx])
-		fmt.Printf("Cheat %d path length: %v\n", idx, len(cheatedPaths[idx]))
-		fmt.Printf("A saving of %d\n\n", len(path) - len(cheatedPaths[idx]))
-		
+	cheats = append(cheats,cheat(grid, path)...)
+	saved100 := 0
+	for _, cheat := range cheats {
+		if len(path) - len(cheat.Path) > 99 {
+			// fmt.Printf("\nFound cheat if length: %d ... a saving of: %d\n", len(cheat.Path), len(path)-len(cheat.Path))
+			// fmt.Printf("Start: %v\n", cheat.Start)
+			// fmt.Printf("End: %v\n", cheat.End)
+			// fmt.Printf("Path: %v\n", cheat.Path)
+			// util.PrintGridWithPath(grid, cheat.Path)
+			saved100++
+		}
+		// fmt.Printf("Start: %v\n", cheat.Start)
+		// fmt.Printf("End: %v\n", cheat.End
+		// fmt.Printf("Path: %v\n", cheat.Path)
+		// util.PrintGridWithPath(grid, cheat.Path)
 	}
 
-	// grid[cheats[chIdx].Start[0]][cheats[chIdx].Start[1]] = '1'
-	// grid[cheats[chIdx].End[0]][cheats[chIdx].End[1]] = '2'
-	// util.PrintGrid(grid)
+	fmt.Printf("\n==============================\n")
+	fmt.Printf("Cheats that save at least 100: %d\n", saved100)
+	fmt.Printf("Total cheats: %d\n", len(cheats))
 }

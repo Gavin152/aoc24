@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-func SliceToGrid (lines []string) [][]rune {
+func SliceToGrid(lines []string) [][]rune {
 	xlen := len(lines[0])
 	ylen := len(lines)
 	grid := make([][]rune, xlen)
@@ -22,12 +22,12 @@ func SliceToGrid (lines []string) [][]rune {
 	return grid
 }
 
-func ParseGridToInt (grid [][]rune) ([][]int, error) {
+func ParseGridToInt(grid [][]rune) ([][]int, error) {
 	gridInt := [][]int{}
-	
+
 	for i, col := range grid {
 		intcol := []int{}
-		for j:= range col {
+		for j := range col {
 			newInt, err := strconv.Atoi(string(grid[j][i]))
 			if err != nil {
 				newInt = -1
@@ -39,10 +39,33 @@ func ParseGridToInt (grid [][]rune) ([][]int, error) {
 	return gridInt, nil
 }
 
-func PrintGrid [T any](grid [][]T) {
+func PrintGrid[T any](grid [][]T) {
 	for i, col := range grid {
 		for j := range col {
 			fmt.Printf("%c", grid[j][i])
+		}
+		fmt.Printf("\n")
+	}
+	fmt.Printf("\n")
+}
+
+func containsPoint(path [][]int, point []int) bool {
+    for _, p := range path {
+        if len(p) == len(point) && p[0] == point[0] && p[1] == point[1] {
+            return true
+        }
+    }
+    return false
+}
+
+func PrintGridWithPath[T any](grid [][]T, path [][]int) {
+	for i, col := range grid {
+		for j := range col {
+			if containsPoint(path, []int{j, i}) {
+				fmt.Printf("%c", 'O')
+			} else {
+				fmt.Printf("%c", grid[j][i])
+			}
 		}
 		fmt.Printf("\n")
 	}
